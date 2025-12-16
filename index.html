@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edupia Feedback Prompt Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="background-blobs"></div>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>Edupia Feedback Prompt Generator</h1>
+                <button id="themeToggle" class="btn-icon" aria-label="Toggle Dark Mode">
+                    <!-- Sun Icon -->
+                    <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <!-- Moon Icon -->
+                    <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+            <p>Tạo prompt phản hồi nhanh chóng và chuyên nghiệp</p>
+        </header>
+
+        <main>
+            <form id="feedbackForm">
+                <!-- Student Info Section -->
+                <section class="card">
+                    <h2>Thông tin học sinh</h2>
+                    <div class="form-group">
+                        <label for="studentName">Tên học sinh</label>
+                        <input type="text" id="studentName" placeholder="Nhập tên học sinh..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lessonContent">Nội dung bài học</label>
+                        <textarea id="lessonContent" rows="3"
+                            placeholder="Ví dụ: Unit 5: Animals, từ vựng về động vật..." required></textarea>
+                    </div>
+                </section>
+
+                <!-- Knowledge Absorption Section -->
+                <section class="card">
+                    <h2>Tiếp thu kiến thức</h2>
+                    <p class="section-desc">Chọn tiêu chí và chấm điểm (1-10)</p>
+
+                    <div class="criteria-list" id="knowledgeCriteria">
+                        <!-- Items will be generated or hardcoded here -->
+                        <!-- Example Item Structure -->
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Từ vựng" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">Từ vựng</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Từ vựng" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Ngữ pháp" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">Ngữ pháp</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Ngữ pháp" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Phát âm" checked>
+                                <span class="checkmark"></span>
+                                <span class="label-text">Phát âm</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Phát âm" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Ngữ âm">
+                                <span class="checkmark"></span>
+                                <span class="label-text">Ngữ âm</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Ngữ âm" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Đọc hiểu">
+                                <span class="checkmark"></span>
+                                <span class="label-text">Đọc hiểu</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Đọc hiểu" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Nghe hiểu">
+                                <span class="checkmark"></span>
+                                <span class="label-text">Nghe hiểu</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Nghe hiểu" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+
+                        <div class="criteria-item">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" name="criteria_include" value="Phản xạ">
+                                <span class="checkmark"></span>
+                                <span class="label-text">Phản xạ</span>
+                            </label>
+                            <div class="slider-wrapper">
+                                <input type="range" name="criteria_score_Phản xạ" min="1" max="10" value="8"
+                                    oninput="this.nextElementSibling.value = this.value">
+                                <output>8</output>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Learning Attitude Section -->
+                <section class="card">
+                    <h2>Thái độ học tập</h2>
+
+                    <div class="attitude-group">
+                        <h3>Năng lượng / Tinh thần</h3>
+                        <div class="checkbox-grid">
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="tích cực"><span>tích cực</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="sôi nổi"><span>sôi nổi</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="vui vẻ"><span>vui
+                                    vẻ</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="hứng thú"><span>hứng thú</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="tự tin"><span>tự
+                                    tin</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="lạc quan"><span>lạc quan</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="mệt mỏi"><span>mệt mỏi</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="chán nản"><span>chán nản</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="trầm tính"><span>trầm tính</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="tự ti"><span>tự
+                                    ti</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="xấu hổ"><span>xấu
+                                    hổ</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="ngại nói"><span>ngại nói</span></label>
+                        </div>
+                    </div>
+
+                    <div class="attitude-group">
+                        <h3>Khả năng tập trung</h3>
+                        <div class="checkbox-grid">
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="tập trung nghe giảng"><span>tập trung nghe giảng</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="chú ý bài học"><span>chú ý bài học</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="tích cực phát biểu"><span>tích cực phát biểu</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="sao nhãng"><span>sao nhãng</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="làm việc riêng"><span>làm việc riêng</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="không tập trung"><span>không tập trung</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="lơ là"><span>lơ
+                                    là</span></label>
+                        </div>
+                    </div>
+
+                    <div class="attitude-group">
+                        <h3>Thái độ với bạn học</h3>
+                        <div class="checkbox-grid">
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="hòa đồng"><span>hòa đồng</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="biết chia sẻ"><span>biết chia sẻ</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="giúp đỡ bạn bè"><span>giúp đỡ bạn bè</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="nóng nảy"><span>nóng nảy</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="chưa hòa đồng"><span>chưa hòa đồng</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="chưa biết tương tác với bạn"><span>chưa biết tương tác với bạn</span></label>
+                        </div>
+                    </div>
+
+                    <div class="attitude-group">
+                        <h3>Thái độ với giáo viên</h3>
+                        <div class="checkbox-grid">
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="biết nghe lời"><span>biết nghe lời</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="lễ phép"><span>lễ
+                                    phép</span></label>
+                            <label class="pill-checkbox positive"><input type="checkbox" name="attitude"
+                                    value="ngoan ngoãn"><span>ngoan ngoãn</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="chưa vâng lời"><span>chưa vâng lời</span></label>
+                            <label class="pill-checkbox negative"><input type="checkbox" name="attitude"
+                                    value="còn để thầy cô nhắc nhở nhiều"><span>còn để thầy cô nhắc nhở
+                                    nhiều</span></label>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="action-buttons">
+                    <button type="button" id="refreshBtn" class="btn secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="vertical-align: middle; margin-right: 5px;">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Làm mới
+                    </button>
+                    <button type="button" id="generateBtn" class="btn primary">Generate Prompt</button>
+                    <!-- Output section will appear here -->
+                </div>
+            </form>
+
+            <section id="outputSection" class="card hidden">
+                <div class="output-header">
+                    <h2>Generated Prompt</h2>
+                    <button type="button" id="copyBtn" class="btn secondary">Copy to Clipboard</button>
+                </div>
+                <pre><code id="promptOutput"></code></pre>
+            </section>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -29,13 +29,13 @@ The app is web based (html, css, js) and uses input from the user to generate th
 - [ ] xấu hổ, 
 - [ ] ngại nói…
 ### Khả năng tập trung
- - [ ] tập trung nghe giảng, 
- - [ ] chú ý bài học, 
- - [ ] tích cực phát biểu, 
- - [ ] sao nhãng, 
- - [ ] làm việc riêng, 
- - [ ] không tập trung, 
- - [ ] lơ là
+- [ ] tập trung nghe giảng, 
+- [ ] chú ý bài học, 
+- [ ] tích cực phát biểu, 
+- [ ] sao nhãng, 
+- [ ] làm việc riêng, 
+- [ ] không tập trung, 
+- [ ] lơ là
 ### Thái độ trong các hoạt động với bạn học
 - [ ] hòa đồng, 
 - [ ] biết chia sẻ, 
@@ -52,7 +52,8 @@ The app is web based (html, css, js) and uses input from the user to generate th
 ```
 
 ### Requirements set for the LLM
-1. Output a compact, precise and clear single markdown paragraph feedback for 2 specific criteria, namely "Tiếp thu kiến thức" and "Thái độ học tập". Make sure to put them inside code brackets for the teacher to easily copy and paste them.
-2. The feedback should be in Vietnamese
-3. Refer to the student as "em" or their name
-4. Avoid using the score (such as "8/10") in the output feedback to sound more natural and less "automated". Just give the evaluation based on the criteria. 
+1. Output a compact, precise and clear single markdown paragraph feedback for 2 specific criteria, namely "Tiếp thu kiến thức" and "Thái độ học tập". 
+2. Make sure to put "Tiếp thu kiến thức" and "Thái độ học tập" inside 2 separate code brackets for the teacher to easily copy and paste them.
+3. The feedback should be in Vietnamese
+4. Refer to the student as "em" or their name
+5. Avoid using the score (such as "8/10") in the output feedback to sound more natural and less "automated". Just give the evaluation based on the criteria. 
