@@ -193,7 +193,9 @@ header h1 {
 }
 
 [data-theme="dark"] input[type="range"] {
-    background: #374151;
+    background: #4b5563;
+    /* Lighter gray for better visibility */
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="dark"] .pill-checkbox span {
@@ -291,6 +293,25 @@ select:focus {
     background: rgba(255, 255, 255, 0.8);
     transition: all 0.2s;
     cursor: pointer;
+}
+
+
+
+/* Slider Interaction Hint */
+.slider-interaction-area {
+    padding: 0.5rem;
+    margin: -0.5rem;
+    /* Negative margin to offset padding so layout doesn't shift too much, but effective area grows */
+    border-radius: var(--radius-md);
+    transition: background-color 0.2s ease;
+}
+
+.slider-interaction-area:hover {
+    background-color: rgba(99, 102, 241, 0.1);
+}
+
+[data-theme="dark"] .slider-interaction-area:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Criteria List (Sliders) */
@@ -697,4 +718,180 @@ input:checked+.slider:before {
 
 [data-theme="dark"] .theme-icon::before {
     content: "🌙";
+}
+
+/* --- Group Feedback Page Styles --- */
+
+.students-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.section-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.1);
+}
+
+.section-header-row h2 {
+    margin-bottom: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.9rem;
+}
+
+.switch-toggle {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 20px;
+    padding: 3px;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.switch-toggle input {
+    display: none;
+}
+
+.switch-toggle label {
+    padding: 4px 12px;
+    cursor: pointer;
+    border-radius: 16px;
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    z-index: 1;
+    color: var(--text-secondary);
+}
+
+.switch-toggle input:checked+label {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Group Criteria Containers */
+.group-criteria-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.group-row {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.group-row h4 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.group-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    /* 4 columns for 4 students */
+    gap: 1rem;
+    align-items: center;
+}
+
+.group-controls-grid.bulk-mode {
+    grid-template-columns: 1fr;
+    /* Single column for bulk */
+    max-width: 400px;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.control-item label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.control-item input[type="range"] {
+    width: 100%;
+}
+
+/* Attitude Group Grid */
+.group-attitude-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.attitude-category {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.attitude-category h4 {
+    margin-bottom: 1rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.attitude-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+.attitude-grid-layout.bulk-mode {
+    grid-template-columns: 1fr;
+}
+
+.student-attitude-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.student-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    color: var(--primary-color);
+}
+
+/* Responsive adjustments for Group Page */
+@media (max-width: 768px) {
+    .students-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .group-controls-grid {
+        grid-template-columns: 1fr 1fr;
+        /* Wrap to 2x2 on mobile */
+    }
+
+    .attitude-grid-layout {
+        grid-template-columns: 1fr 1fr;
+    }
 }
