@@ -1,9 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Existing Elements
-    const generateBtn = document.getElementById('generateBtn');
-    const copyBtn = document.getElementById('copyBtn');
-    const promptOutput = document.getElementById('promptOutput');
-    const outputSection = document.getElementById('outputSection');
+    // (Removed legacy student feedback elements)
+
 
     // Navigation & Page Elements
     const navItems = document.querySelectorAll('.nav-item');
@@ -11,10 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageDescription = document.getElementById('pageDescription');
 
     // Student Feedback Elements
-    const refreshBtn = document.getElementById('refreshBtn');
+    // (Removed legacy student feedback elements)
+
 
     // Lesson Feedback Elements
-    const lessonRefreshBtn = document.getElementById('lessonRefreshBtn');
+    const lessonFabRefresh = document.getElementById('lessonFabRefresh');
     const lessonGenerateBtn = document.getElementById('lessonGenerateBtn');
     const lessonCopyBtn = document.getElementById('lessonCopyBtn');
     const lessonOutputSection = document.getElementById('lessonOutputSection');
@@ -60,8 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // Update Header Description
-            if (targetId === 'page-student-feedback') {
-                pageDescription.textContent = 'Tạo prompt phản hồi học sinh nhanh chóng va chuyên nghiệp';
+            if (targetId === 'page-group-feedback') {
+                pageDescription.textContent = 'Tạo prompt phản hồi cho học sinh (1-6 bạn)';
             } else if (targetId === 'page-lesson-feedback') {
                 pageDescription.textContent = 'Tạo báo cáo tổng kết buổi học chuyên nghiệp';
             }
@@ -69,109 +68,34 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    // --- Student Feedback Logic (Existing) ---
 
-    refreshBtn.addEventListener('click', () => {
-        if (confirm('Bạn có chắc chắn muốn làm mới tất cả thông tin học sinh?')) {
-            document.getElementById('studentName').value = '';
-            document.getElementById('lessonContent').value = '';
+    // --- Legacy Student Feedback Logic Removed ---
 
-            const criteriaItems = document.querySelectorAll('.criteria-item');
-            criteriaItems.forEach(item => {
-                const range = item.querySelector('input[type="range"]');
-                const output = item.querySelector('output');
-                range.value = 8;
-                output.textContent = 8;
-            });
 
-            const attitudeCheckboxes = document.querySelectorAll('input[name="attitude"]');
-            attitudeCheckboxes.forEach(cb => cb.checked = false);
-
-            outputSection.classList.add('hidden');
-            promptOutput.textContent = '';
-        }
-    });
-
-    generateBtn.addEventListener('click', generatePrompt);
-    copyBtn.addEventListener('click', () => copyToClipboard(promptOutput, copyBtn));
-
-    function generatePrompt() {
-        const studentName = document.getElementById('studentName').value.trim();
-        const lessonContent = document.getElementById('lessonContent').value.trim();
-
-        if (!studentName || !lessonContent) {
-            alert('Vui lòng nhập tên học sinh và nội dung bài học!');
-            return;
-        }
-
-        const knowledgeCriteria = [];
-        const criteriaItems = document.querySelectorAll('.criteria-item');
-
-        criteriaItems.forEach(item => {
-            const checkbox = item.querySelector('input[name="criteria_include"]');
-            if (checkbox.checked) {
-                const criteriaName = checkbox.value;
-                const score = item.querySelector('input[type="range"]').value;
-                knowledgeCriteria.push({ name: criteriaName, score: score });
-            }
-        });
-
-        const attitudeItems = [];
-        const attitudeCheckboxes = document.querySelectorAll('input[name="attitude"]:checked');
-        attitudeCheckboxes.forEach(cb => {
-            attitudeItems.push(cb.value);
-        });
-
-        const promptText = `
-Hãy đóng vai trò là một giáo viên tiếng Anh nghiêm khắc và chuyên nghiệp. Dựa trên thông tin dưới đây, hãy viết một đoạn nhận xét ngắn gọn, súc tích (khoảng 100-150 chữ) bằng tiếng Việt dành cho phụ huynh của học sinh.
-
-Thông tin học sinh:
-- Tên: ${studentName}
-- Nội dung bài học: ${lessonContent}
-
-Kết quả học tập (Thang điểm 10):
-${knowledgeCriteria.map(k => `- ${k.name}: ${k.score}/10`).join('\n')}
-
-Thái độ học tập:
-${attitudeItems.length > 0 ? attitudeItems.map(a => `- ${a}`).join('\n') : '- (Không ghi nhận đặc biệt)'}
-
-Yêu cầu output:
-1. Viết 2 đoạn nhận xét riêng biệt cho "Tiếp thu kiến thức" và "Thái độ học tập".
-2. Ngôn ngữ: Tiếng Việt, giọng văn thẳng thắn, khách quan, đi thẳng vào vấn đề.
-3. TUYỆT ĐỐI KHÔNG có lời chào đầu thư (như "Chào phụ huynh", "Gửi gia đình"...).
-4. TUYỆT ĐỐI KHÔNG có lời khen ngợi sáo rỗng hay động viên cuối thư (như "Cố gắng phát huy", "Chúc em học tốt"...). Chỉ tập trung vào nhận xét năng lực thực tế.
-5. Xưng hô: Gọi học sinh là "em" hoặc "${studentName}".
-6. TUYỆT ĐỐI KHÔNG nhắc đến điểm số (ví dụ: "con được 8 điểm", "8/10") trong bài nhận xét. Điểm số chỉ dùng để bạn đánh giá mức độ tốt/khá/trung bình.
-7. Đặt nội dung nhận xét "Tiếp thu kiến thức" vào trong block code markdown đầu tiên. LƯU Ý: Chỉ xuất ra nội dung text thuần túy, KHÔNG bao gồm tiêu đề (như "Tiếp thu kiến thức").
-8. Đặt nội dung nhận xét "Thái độ học tập" vào trong block code markdown thứ hai. LƯU Ý: Chỉ xuất ra nội dung text thuần túy, KHÔNG bao gồm tiêu đề (như "Thái độ học tập").
-`.trim();
-
-        promptOutput.textContent = promptText;
-        outputSection.classList.remove('hidden');
-        outputSection.scrollIntoView({ behavior: 'smooth' });
-    }
 
 
     // --- Whole Lesson Feedback Logic (New) ---
 
-    lessonRefreshBtn.addEventListener('click', () => {
-        if (confirm('Bạn có chắc chắn muốn làm mới tất cả thông tin buổi học?')) {
-            document.getElementById('checkAtmosphere').checked = true;
-            document.getElementById('selectAtmosphere').value = 'Sôi nổi';
+    if (lessonFabRefresh) {
+        lessonFabRefresh.addEventListener('click', () => {
+            if (confirm('Bạn có chắc chắn muốn làm mới tất cả thông tin buổi học?')) {
+                document.getElementById('checkAtmosphere').checked = true;
+                document.getElementById('selectAtmosphere').value = 'Sôi nổi';
 
-            document.getElementById('checkProgress').checked = true;
-            document.getElementById('selectProgress').value = 'Bình thường';
+                document.getElementById('checkProgress').checked = true;
+                document.getElementById('selectProgress').value = 'Bình thường';
 
-            document.getElementById('checkLate').checked = false;
-            document.getElementById('inputLate').value = '';
+                document.getElementById('checkLate').checked = false;
+                document.getElementById('inputLate').value = '';
 
-            const reminderCheckboxes = document.querySelectorAll('input[name="reminder"]');
-            reminderCheckboxes.forEach(cb => cb.checked = false);
+                const reminderCheckboxes = document.querySelectorAll('input[name="reminder"]');
+                reminderCheckboxes.forEach(cb => cb.checked = false);
 
-            lessonOutputSection.classList.add('hidden');
-            lessonPromptOutput.textContent = '';
-        }
-    });
+                lessonOutputSection.classList.add('hidden');
+                lessonPromptOutput.textContent = '';
+            }
+        });
+    }
 
     lessonGenerateBtn.addEventListener('click', generateLessonFeedback);
     lessonCopyBtn.addEventListener('click', () => copyToClipboard(lessonPromptOutput, lessonCopyBtn));
@@ -331,6 +255,7 @@ const navBadge = document.getElementById('navBadge');
 const knowledgeGroupContainer = document.getElementById('knowledgeGroupContainer');
 const attitudeGroupContainer = document.getElementById('attitudeGroupContainer');
 const groupGenerateBtn = document.getElementById('groupGenerateBtn');
+const groupFabRefresh = document.getElementById('groupFabRefresh');
 const groupCopyBtn = document.getElementById('groupCopyBtn');
 const groupPromptOutput = document.getElementById('groupPromptOutput');
 const groupOutputSection = document.getElementById('groupOutputSection');
@@ -735,12 +660,12 @@ ${attitudeText}
 
 Yêu cầu output (Nghiêm khắc, khách quan, KHÔNG chào hỏi/động viên sáo rỗng, TUYỆT ĐỐI KHÔNG nhắc đến điểm số):
 1. **Tiếp thu kiến thức**:
-\`\`\`
+\`\`\`plaintext
 [Nội dung nhận xét kiến thức cho ${name}]
 \`\`\`
 
 2. **Thái độ học tập**:
-\`\`\`
+\`\`\`plaintext
 [Nội dung nhận xét thái độ cho ${name}]
 \`\`\`
 `.trim();
