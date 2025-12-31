@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedTheme) {
         applyTheme(savedTheme === 'dark');
     } else {
-        applyTheme(systemDark.matches);
+        applyTheme(true);
     }
 
     // 2. Listen for System Changes (only if no user preference is saved)
