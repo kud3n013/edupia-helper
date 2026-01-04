@@ -7,7 +7,7 @@ import { Background } from "@/components/Background";
 import { createClient } from "@/utils/supabase/server";
 
 const beVietnamPro = Be_Vietnam_Pro({
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-be-vietnam-pro",
   subsets: ["vietnamese", "latin"],
   display: "swap",
@@ -30,7 +30,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${beVietnamPro.variable} antialiased`}
+        className={`${beVietnamPro.variable} font-sans antialiased`}
       >
         <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
           <Background />

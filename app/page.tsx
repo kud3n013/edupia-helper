@@ -13,7 +13,7 @@ export default async function Home() {
     <>
       <header className="text-center mb-8">
         <div className="flex justify-center items-center gap-4 mb-2 relative">
-          <h1 className="text-[2.5rem] font-extrabold text-[var(--primary-color)] shadow-sm leading-tight drop-shadow-sm">
+          <h1 className="text-[2.5rem] font-bold text-[var(--primary-color)] shadow-sm leading-tight drop-shadow-sm">
             Edupia Helper
           </h1>
         </div>

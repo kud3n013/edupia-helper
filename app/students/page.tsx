@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { copyToClipboard, cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/Slider";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
@@ -100,6 +101,31 @@ export default function StudentsPage() {
     // Drag State
     const dragItem = useRef<number | null>(null);
     const dragOverItem = useRef<number | null>(null);
+    const studentSectionRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleWheel = (e: WheelEvent) => {
+            if (studentSectionRef.current && studentSectionRef.current.contains(e.target as Node)) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    setStudentCount(prev => Math.min(MAX_STUDENTS, prev + 1));
+                } else {
+                    setStudentCount(prev => Math.max(1, prev - 1));
+                }
+            }
+        };
+
+        const currentRef = studentSectionRef.current;
+        if (currentRef) {
+            currentRef.addEventListener("wheel", handleWheel, { passive: false });
+        }
+
+        return () => {
+            if (currentRef) {
+                currentRef.removeEventListener("wheel", handleWheel);
+            }
+        };
+    }, []);
 
     // --- Handlers ---
 
@@ -283,23 +309,43 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         </div>
                     </div>
 
-                    <div className="mb-8">
+                    <div className="mb-8" ref={studentSectionRef}>
                         <div className="flex items-center gap-4 mb-2">
                             <label htmlFor="studentCountInput" className="font-medium m-0">Số lượng học sinh:</label>
-                            <span className="font-bold text-[var(--primary-color)] text-lg">{studentCount}</span>
                         </div>
-                        <input
-                            type="range"
-                            id="studentCountInput"
-                            min="1"
-                            max="6"
-                            value={studentCount}
-                            onChange={(e) => setStudentCount(Number(e.target.value))}
-                            className="w-full h-[6px] bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[var(--primary-color)]"
-                        />
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setStudentCount(Math.max(1, studentCount - 1))}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>
+                            </button>
+                            <input
+                                type="number"
+                                id="studentCountInput"
+                                min="1"
+                                max="6"
+                                value={studentCount}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    if (!isNaN(val)) {
+                                        setStudentCount(Math.max(1, Math.min(6, val)));
+                                    }
+                                }}
+                                className="w-20 text-center p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] font-bold text-lg"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setStudentCount(Math.min(6, studentCount + 1))}
+                                className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+                            </button>
+                        </div>
                     </div>
 
-                    <div className={`grid gap-4`} style={{ gridTemplateColumns: `repeat(${studentCount}, minmax(0, 1fr))` }}>
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]" style={{ '--cols': studentCount } as React.CSSProperties}>
                         {students.slice(0, studentCount).map((student, index) => (
                             <div
                                 key={student.id}
@@ -364,7 +410,10 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         {CRITERIA_LIST.filter(c => includedCriteria.includes(c)).map(criteria => (
                             <div key={criteria} className="group-row">
                                 <h4 className="text-[var(--primary-color)] font-bold mb-2">{criteria}</h4>
-                                <div className={`grid gap-4 ${knowledgeMode === 'bulk' ? 'grid-cols-1' : ''}`} style={{ gridTemplateColumns: knowledgeMode === 'bulk' ? '1fr' : `repeat(${studentCount}, minmax(0, 1fr))` }}>
+                                <div
+                                    className={`grid gap-4 ${knowledgeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
+                                    style={{ '--cols': studentCount } as React.CSSProperties}
+                                >
                                     {(knowledgeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => {
                                         const val = students[i].scores[criteria];
                                         return (
@@ -372,14 +421,15 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                                                 <label className="text-xs truncate font-medium text-[var(--text-secondary)]">
                                                     {knowledgeMode === 'bulk' ? "Tất cả học sinh" : (students[i].name || `HS ${i + 1}`)}
                                                 </label>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="range" min="1" max="10"
+                                                <div className="flex items-center gap-3">
+                                                    <Slider
+                                                        min={1}
+                                                        max={10}
                                                         value={val}
-                                                        onChange={(e) => handleScoreChange(criteria, Number(e.target.value), i)}
-                                                        className="w-full h-[6px] bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[var(--primary-color)]"
+                                                        onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
+                                                        className="flex-1"
                                                     />
-                                                    <span className="font-bold text-[var(--primary-color)] w-[20px] text-right">{val}</span>
+                                                    <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
                                                 </div>
                                             </div>
                                         );
@@ -430,7 +480,10 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         {ATTITUDE_CATEGORIES.filter(c => includedAttitudeCategories.includes(c)).map(category => (
                             <div key={category}>
                                 <h4 className="text-[var(--text-secondary)] font-bold mb-3 text-lg">{category}</h4>
-                                <div className={`grid gap-4 ${attitudeMode === 'bulk' ? 'grid-cols-1' : ''}`} style={{ gridTemplateColumns: attitudeMode === 'bulk' ? '1fr' : `repeat(${studentCount}, minmax(0, 1fr))` }}>
+                                <div
+                                    className={`grid gap-4 ${attitudeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
+                                    style={{ '--cols': studentCount } as React.CSSProperties}
+                                >
                                     {(attitudeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => (
                                         <div key={i} className="flex flex-col gap-2">
                                             {!((attitudeMode === 'bulk')) && (
