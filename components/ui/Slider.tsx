@@ -1,6 +1,7 @@
 "use client";
 
 import React, { ChangeEvent, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 interface SliderProps {
     min?: number;
@@ -63,8 +64,28 @@ export const Slider: React.FC<SliderProps> = ({
     return (
         <div
             ref={containerRef}
-            className={`relative w-full h-6 flex items-center ${className} ${disabled ? 'opacity-60 grayscale' : ''}`}
+            className={`relative w-full h-10 px-2 rounded-lg flex items-center transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${className} ${disabled ? 'opacity-60 grayscale' : ''}`}
         >
+            {/* Visual Track */}
+            <div className="absolute left-2 right-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-visible pointer-events-none">
+                {/* Fill Bar */}
+                <motion.div
+                    className="absolute top-0 left-0 h-full bg-[var(--primary-color)] rounded-full"
+                    initial={false}
+                    animate={{ width: `${percentage}%` }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+
+                {/* Thumb */}
+                <motion.div
+                    className="absolute top-1/2 w-[18px] h-[18px] -mt-[9px] bg-white border-2 border-[var(--primary-color)] rounded-full shadow-md z-20"
+                    initial={false}
+                    animate={{ left: `${percentage}%` }}
+                    style={{ x: "-50%" }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
+            </div>
+
             <input
                 type="range"
                 min={min}
@@ -73,58 +94,8 @@ export const Slider: React.FC<SliderProps> = ({
                 value={value}
                 onChange={handleChange}
                 disabled={disabled}
-                className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 outline-none focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)]/30 transition-all z-10"
-                style={{
-                    backgroundImage: `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${percentage}%, transparent ${percentage}%, transparent 100%)`
-                }}
+                className="w-full h-full opacity-0 cursor-pointer absolute inset-0 z-10"
             />
-            {/* Custom Styles for styling the thumb across browsers */}
-            <style jsx>{`
-        input[type=range]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          height: 18px;
-          width: 18px;
-          border-radius: 50%;
-          background: #ffffff;
-          border: 2px solid var(--primary-color);
-          cursor: pointer;
-          margin-top: 0px; /* Adjust if needed */
-          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-          transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-          transform: scale(1.1);
-        }
-        input[type=range]::-moz-range-thumb {
-          height: 18px;
-          width: 18px;
-          border-radius: 50%;
-          background: #ffffff;
-          border: 2px solid var(--primary-color);
-          cursor: pointer;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-          transition: transform 0.1s;
-        }
-         input[type=range]::-moz-range-thumb:hover {
-          transform: scale(1.1);
-        }
-        /* Track background for webkit is handled by the linear gradient on the input itself, 
-           but we need to make sure the native track is transparent or styled appropriately if using runable-track */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 8px;
-            cursor: pointer;
-            background: transparent; /* Let the input background gradient show */
-            border-radius: 9999px;
-        }
-        input[type=range]::-moz-range-track {
-            width: 100%;
-            height: 8px;
-            cursor: pointer;
-            background: rgba(0,0,0,0.1); 
-            border-radius: 9999px;
-        }
-      `}</style>
         </div>
     );
 };

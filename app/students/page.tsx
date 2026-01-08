@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { copyToClipboard, cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/Slider";
+import { Reorder, AnimatePresence, motion } from "framer-motion";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
@@ -80,6 +81,17 @@ export default function StudentsPage() {
         "Ngữ pháp",
         "Phản xạ",
     ]);
+    const [isDesktop, setIsDesktop] = useState(false);
+
+    useEffect(() => {
+        const checkDesktop = () => {
+            setIsDesktop(window.innerWidth >= 768); // md breakpoint
+        };
+
+        checkDesktop();
+        window.addEventListener('resize', checkDesktop);
+        return () => window.removeEventListener('resize', checkDesktop);
+    }, []);
     const [includedAttitudeCategories, setIncludedAttitudeCategories] = useState<string[]>(
         ATTITUDE_CATEGORIES
     );
@@ -309,7 +321,7 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         </div>
                     </div>
 
-                    <div className="mb-8" ref={studentSectionRef}>
+                    <div className="mb-8 p-3 -mx-3 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5" ref={studentSectionRef} data-lenis-prevent>
                         <div className="flex items-center gap-4 mb-2">
                             <label htmlFor="studentCountInput" className="font-medium m-0">Số lượng học sinh:</label>
                         </div>
@@ -345,29 +357,51 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         </div>
                     </div>
 
-                    <div className="grid gap-4 grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]" style={{ '--cols': studentCount } as React.CSSProperties}>
-                        {students.slice(0, studentCount).map((student, index) => (
-                            <div
+                    <Reorder.Group
+                        axis={isDesktop ? "x" : "y"}
+                        values={students.slice(0, studentCount)}
+                        onReorder={(reorderedStats) => {
+                            const remainingStudents = students.slice(studentCount);
+                            setStudents([...reorderedStats, ...remainingStudents]);
+                        }}
+                        className="grid gap-4 grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
+                        style={{ '--cols': studentCount } as React.CSSProperties}
+                    >
+                        {students.slice(0, studentCount).map((student) => (
+                            <Reorder.Item
                                 key={student.id}
-                                className="mb-4 relative group"
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, index)}
-                                onDragEnter={(e) => handleDragEnter(e, index)}
-                                onDragEnd={() => { dragItem.current = null; dragOverItem.current = null; }}
-                                onDrop={handleDrop}
-                                onDragOver={(e) => e.preventDefault()}
+                                value={student}
+                                className="mb-4 relative group bg-white dark:bg-gray-800/50 rounded-[var(--radius-md)] border border-transparent hover:border-[var(--primary-color)] transition-colors"
                             >
-                                <label className="block mb-2 font-medium cursor-grab active:cursor-grabbing text-sm">Học sinh {index + 1}</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm shadow-sm"
-                                    placeholder={`Tên HS ${index + 1}`}
-                                    value={student.name}
-                                    onChange={(e) => handleStudentNameChange(index, e.target.value)}
-                                />
-                            </div>
+                                <div className="p-1">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="font-medium cursor-grab active:cursor-grabbing text-sm flex items-center gap-2 select-none">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                                <circle cx="9" cy="12" r="1" />
+                                                <circle cx="9" cy="5" r="1" />
+                                                <circle cx="9" cy="19" r="1" />
+                                                <circle cx="15" cy="12" r="1" />
+                                                <circle cx="15" cy="5" r="1" />
+                                                <circle cx="15" cy="19" r="1" />
+                                            </svg>
+                                            Học sinh {student.id + 1}
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        className="w-full p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm shadow-sm"
+                                        placeholder={`Tên HS ${student.id + 1}`}
+                                        value={student.name}
+                                        onChange={(e) => {
+                                            const newStudents = students.map(s => s.id === student.id ? { ...s, name: e.target.value } : s);
+                                            setStudents(newStudents);
+                                        }}
+                                        onPointerDown={(e) => e.stopPropagation()}
+                                    />
+                                </div>
+                            </Reorder.Item>
                         ))}
-                    </div>
+                    </Reorder.Group>
                 </section>
 
                 {/* Knowledge Section */}
@@ -406,37 +440,48 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                     </div>
 
                     {/* Sliders Grid */}
-                    <div className="space-y-6">
-                        {CRITERIA_LIST.filter(c => includedCriteria.includes(c)).map(criteria => (
-                            <div key={criteria} className="group-row">
-                                <h4 className="text-[var(--primary-color)] font-bold mb-2">{criteria}</h4>
-                                <div
-                                    className={`grid gap-4 ${knowledgeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
-                                    style={{ '--cols': studentCount } as React.CSSProperties}
+                    <div className="flex flex-col">
+                        <AnimatePresence initial={false}>
+                            {CRITERIA_LIST.filter(c => includedCriteria.includes(c)).map(criteria => (
+                                <motion.div
+                                    key={criteria}
+                                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                    animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
+                                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    className="overflow-hidden"
                                 >
-                                    {(knowledgeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => {
-                                        const val = students[i].scores[criteria];
-                                        return (
-                                            <div key={i} className="flex flex-col gap-1">
-                                                <label className="text-xs truncate font-medium text-[var(--text-secondary)]">
-                                                    {knowledgeMode === 'bulk' ? "Tất cả học sinh" : (students[i].name || `HS ${i + 1}`)}
-                                                </label>
-                                                <div className="flex items-center gap-3">
-                                                    <Slider
-                                                        min={1}
-                                                        max={10}
-                                                        value={val}
-                                                        onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
-                                                        className="flex-1"
-                                                    />
-                                                    <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
+                                    <div className="group-row pb-2">
+                                        <h4 className="text-[var(--primary-color)] font-bold mb-2">{criteria}</h4>
+                                        <div
+                                            className={`grid gap-4 ${knowledgeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
+                                            style={{ '--cols': studentCount } as React.CSSProperties}
+                                        >
+                                            {(knowledgeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => {
+                                                const val = students[i].scores[criteria];
+                                                return (
+                                                    <div key={i} className="flex flex-col gap-1">
+                                                        <label className="text-xs truncate font-medium text-[var(--text-secondary)]">
+                                                            {knowledgeMode === 'bulk' ? "Tất cả học sinh" : (students[i].name || `HS ${i + 1}`)}
+                                                        </label>
+                                                        <div className="flex items-center gap-3">
+                                                            <Slider
+                                                                min={1}
+                                                                max={10}
+                                                                value={val}
+                                                                onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
+                                                                className="flex-1"
+                                                            />
+                                                            <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
                     </div>
                 </section>
 
@@ -476,48 +521,59 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                     </div>
 
                     {/* Attitude Grid */}
-                    <div className="space-y-8">
-                        {ATTITUDE_CATEGORIES.filter(c => includedAttitudeCategories.includes(c)).map(category => (
-                            <div key={category}>
-                                <h4 className="text-[var(--text-secondary)] font-bold mb-3 text-lg">{category}</h4>
-                                <div
-                                    className={`grid gap-4 ${attitudeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
-                                    style={{ '--cols': studentCount } as React.CSSProperties}
+                    <div className="flex flex-col">
+                        <AnimatePresence initial={false}>
+                            {ATTITUDE_CATEGORIES.filter(c => includedAttitudeCategories.includes(c)).map(category => (
+                                <motion.div
+                                    key={category}
+                                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                    animate={{ opacity: 1, height: "auto", marginBottom: 32 }}
+                                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                    className="overflow-hidden"
                                 >
-                                    {(attitudeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => (
-                                        <div key={i} className="flex flex-col gap-2">
-                                            {!((attitudeMode === 'bulk')) && (
-                                                <div className="text-xs font-bold text-center text-[var(--text-main)] mb-1">
-                                                    {students[i].name || `HS ${i + 1}`}
-                                                </div>
-                                            )}
-                                            <div className="flex flex-wrap gap-1 justify-center">
-                                                {ATTITUDE_DATA[category].map(tag => {
-                                                    const isPos = isValidPositive(tag);
-                                                    const isNeg = isValidNegative(tag);
-                                                    const isChecked = students[i].attitudes.includes(tag);
+                                    <div className="pb-4">
+                                        <h4 className="text-[var(--text-secondary)] font-bold mb-3 text-lg">{category}</h4>
+                                        <div
+                                            className={`grid gap-4 ${attitudeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
+                                            style={{ '--cols': studentCount } as React.CSSProperties}
+                                        >
+                                            {(attitudeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => (
+                                                <div key={i} className="flex flex-col gap-2">
+                                                    {!((attitudeMode === 'bulk')) && (
+                                                        <div className="text-xs font-bold text-center text-[var(--text-main)] mb-1">
+                                                            {students[i].name || `HS ${i + 1}`}
+                                                        </div>
+                                                    )}
+                                                    <div className="flex flex-wrap gap-1 justify-center">
+                                                        {ATTITUDE_DATA[category].map(tag => {
+                                                            const isPos = isValidPositive(tag);
+                                                            const isNeg = isValidNegative(tag);
+                                                            const isChecked = students[i].attitudes.includes(tag);
 
-                                                    return (
-                                                        <label key={tag} className={`inline-block px-2 py-1 rounded-[12px] border cursor-pointer select-none text-[0.7rem] transition-all 
-                                                      ${isChecked
-                                                                ? (isPos ? 'bg-green-500 border-green-500 text-white shadow-sm' : (isNeg ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-sm'))
-                                                                : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700'
-                                                            }
-                                                  `}>
-                                                            <input type="checkbox" className="hidden"
-                                                                checked={isChecked}
-                                                                onChange={(e) => handleAttitudeChange(tag, e.target.checked, i)}
-                                                            />
-                                                            {tag}
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
+                                                            return (
+                                                                <label key={tag} className={`inline-block px-2 py-1 rounded-[12px] border cursor-pointer select-none text-[0.7rem] transition-all 
+                                                          ${isChecked
+                                                                        ? (isPos ? 'bg-green-500 border-green-500 text-white shadow-sm' : (isNeg ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-sm'))
+                                                                        : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700'
+                                                                    }
+                                                      `}>
+                                                                    <input type="checkbox" className="hidden"
+                                                                        checked={isChecked}
+                                                                        onChange={(e) => handleAttitudeChange(tag, e.target.checked, i)}
+                                                                    />
+                                                                    {tag}
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
                     </div>
                 </section>
 
