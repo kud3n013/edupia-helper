@@ -23,6 +23,7 @@ export function HomeMenu({ isAuthenticated }: { isAuthenticated: boolean }) {
                     className="bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-lg)] p-8 text-[var(--text-main)] w-[300px] flex flex-col items-center text-center transition-all duration-300 shadow-[var(--shadow-custom-lg)] hover:-translate-y-[5px] hover:bg-white/90 dark:hover:bg-slate-800/90 hover:border-[var(--primary-color)] group"
                 >
                     <svg
+                        suppressHydrationWarning
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="none"
@@ -51,6 +52,7 @@ export function HomeMenu({ isAuthenticated }: { isAuthenticated: boolean }) {
                     className="bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-lg)] p-8 text-[var(--text-main)] w-[300px] flex flex-col items-center text-center transition-all duration-300 shadow-[var(--shadow-custom-lg)] hover:-translate-y-[5px] hover:bg-white/90 dark:hover:bg-slate-800/90 hover:border-[var(--primary-color)] group"
                 >
                     <svg
+                        suppressHydrationWarning
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="none"
