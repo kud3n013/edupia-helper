@@ -13,10 +13,24 @@ export default function LessonPage() {
     const [lateChecked, setLateChecked] = useState(false);
     const [lateValue, setLateValue] = useState("");
 
+    const [sessionNumber, setSessionNumber] = useState(1);
     const [reminders, setReminders] = useState<string[]>([]);
     const [output, setOutput] = useState("");
     const [showOutput, setShowOutput] = useState(false);
     const [copyBtnText, setCopyBtnText] = useState("Copy to Clipboard");
+
+    // Calculate Week 32 based on Jan 9, 2026
+    const getCurrentWeek = () => {
+        const baseDate = new Date('2026-01-09T00:00:00');
+        const now = new Date();
+        const diffTime = now.getTime() - baseDate.getTime();
+        const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+        // If diffTime is negative (before base date), this logic might need adjustment, 
+        // but assuming forward progression from the prompt context.
+        return 32 + diffWeeks;
+    };
+
+    const currentWeek = getCurrentWeek();
 
     const handleReminderChange = (value: string) => {
         setReminders((prev) =>
@@ -61,10 +75,14 @@ export default function LessonPage() {
             part1Text = "1. " + sentences.join(". ") + ".";
         }
 
-        let part2Text = "";
-        if (reminders.length > 0) {
-            part2Text = `2. PH nhớ nhắc các em hoàn thành ${reminders.join(", ")}.`;
-        }
+        // Mandatory Homework String
+        const mandatoryHomework = `BTVN Buổi ${sessionNumber} Tuần ${currentWeek}`;
+
+        // Combine mandatory homework with other optional reminders
+        // Prioritize optional reminders (Exams, Speaking) before BTVN
+        const allReminders = [...reminders, mandatoryHomework];
+
+        let part2Text = `2. PH nhớ nhắc các em hoàn thành ${allReminders.join(", ")}.`;
 
         const finalOutput = [part1Text, part2Text].filter((t) => t).join("\n\n");
 
@@ -172,31 +190,53 @@ export default function LessonPage() {
                 </section>
 
                 <section className="glass-panel p-8 mb-8">
-                    <h2 className="text-2xl font-bold mb-6 text-[var(--text-main)] border-b-2 border-indigo-500/10 pb-2">
-                        2. Nhắc nhở phụ huynh
-                    </h2>
-                    <p className="mb-4 text-[var(--text-secondary)] text-sm">
-                        PH nhớ nhắc các em hoàn thành:
-                    </p>
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-indigo-500/10 pb-2">
+                        <h2 className="text-2xl font-bold text-[var(--text-main)]">
+                            2. Nhắc nhở phụ huynh
+                        </h2>
+                        <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
+                            Tuần {currentWeek}
+                        </div>
+                    </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        {["BTVN", "Bài thi tháng", "Bài tập nói"].map((item) => (
-                            <label
-                                key={item}
-                                className={`inline-block px-4 py-2 rounded-full border cursor-pointer transition-all select-none text-sm ${reminders.includes(item)
-                                    ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-md"
-                                    : "bg-white/50 border-gray-200/10 hover:bg-gray-100 dark:bg-gray-700/50 dark:hover:bg-gray-600"
-                                    }`}
-                            >
-                                <input
-                                    type="checkbox"
-                                    className="hidden"
-                                    checked={reminders.includes(item)}
-                                    onChange={() => handleReminderChange(item)}
-                                />
-                                {item}
-                            </label>
-                        ))}
+                    <div className="mb-6 space-y-4">
+                        <div className="flex items-center gap-3 text-sm">
+                            <span className="font-semibold text-[var(--text-secondary)]">Buổi học:</span>
+                            <div className="flex bg-black/5 rounded-[20px] p-[3px] shadow-inner dark:bg-white/10">
+                                <label className={`px-3 py-1 cursor-pointer rounded-[16px] text-sm font-semibold transition-all ${sessionNumber === 1 ? 'bg-[var(--primary-color)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                    <input type="radio" name="session" className="hidden" checked={sessionNumber === 1} onChange={() => setSessionNumber(1)} />
+                                    Buổi 1
+                                </label>
+                                <label className={`px-3 py-1 cursor-pointer rounded-[16px] text-sm font-semibold transition-all ${sessionNumber === 2 ? 'bg-[var(--primary-color)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5'}`}>
+                                    <input type="radio" name="session" className="hidden" checked={sessionNumber === 2} onChange={() => setSessionNumber(2)} />
+                                    Buổi 2
+                                </label>
+                            </div>
+                        </div>
+
+                        <p className="text-[var(--text-secondary)] text-sm">
+                            PH nhớ nhắc các em hoàn thành <span className="font-bold text-[var(--text-main)]">BTVN Buổi {sessionNumber} Tuần {currentWeek}</span> và:
+                        </p>
+
+                        <div className="flex flex-wrap gap-2">
+                            {["Bài thi tháng", "Bài tập nói"].map((item) => (
+                                <label
+                                    key={item}
+                                    className={`inline-block px-4 py-2 rounded-full border cursor-pointer transition-all select-none text-sm ${reminders.includes(item)
+                                        ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-md"
+                                        : "bg-white/50 border-gray-200/10 hover:bg-gray-100 dark:bg-gray-700/50 dark:hover:bg-gray-600"
+                                        }`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={reminders.includes(item)}
+                                        onChange={() => handleReminderChange(item)}
+                                    />
+                                    {item}
+                                </label>
+                            ))}
+                        </div>
                     </div>
                 </section>
 

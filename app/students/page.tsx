@@ -383,40 +383,46 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                         className="grid gap-4 grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]"
                         style={{ '--cols': studentCount } as React.CSSProperties}
                     >
-                        {students.slice(0, studentCount).map((student) => (
-                            <Reorder.Item
-                                key={student.id}
-                                value={student}
-                                className="mb-4 relative group bg-white dark:bg-gray-800/50 rounded-[var(--radius-md)] border border-transparent hover:border-[var(--primary-color)] transition-colors"
-                            >
-                                <div className="p-1">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <label className="font-medium cursor-grab active:cursor-grabbing text-sm flex items-center gap-2 select-none">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                                                <circle cx="9" cy="12" r="1" />
-                                                <circle cx="9" cy="5" r="1" />
-                                                <circle cx="9" cy="19" r="1" />
-                                                <circle cx="15" cy="12" r="1" />
-                                                <circle cx="15" cy="5" r="1" />
-                                                <circle cx="15" cy="19" r="1" />
-                                            </svg>
-                                            Học sinh {student.id + 1}
-                                        </label>
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            {students.slice(0, studentCount).map((student) => (
+                                <Reorder.Item
+                                    key={student.id}
+                                    value={student}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="mb-4 relative group bg-white dark:bg-gray-800/50 rounded-[var(--radius-md)] border border-transparent hover:border-[var(--primary-color)] transition-colors"
+                                >
+                                    <div className="p-1">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="font-medium cursor-grab active:cursor-grabbing text-sm flex items-center gap-2 select-none">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                                    <circle cx="9" cy="12" r="1" />
+                                                    <circle cx="9" cy="5" r="1" />
+                                                    <circle cx="9" cy="19" r="1" />
+                                                    <circle cx="15" cy="12" r="1" />
+                                                    <circle cx="15" cy="5" r="1" />
+                                                    <circle cx="15" cy="19" r="1" />
+                                                </svg>
+                                                Học sinh {student.id + 1}
+                                            </label>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="w-full p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm shadow-sm"
+                                            placeholder={`Tên HS ${student.id + 1}`}
+                                            value={student.name}
+                                            onChange={(e) => {
+                                                const newStudents = students.map(s => s.id === student.id ? { ...s, name: e.target.value } : s);
+                                                setStudents(newStudents);
+                                            }}
+                                            onPointerDown={(e) => e.stopPropagation()}
+                                        />
                                     </div>
-                                    <input
-                                        type="text"
-                                        className="w-full p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all text-sm shadow-sm"
-                                        placeholder={`Tên HS ${student.id + 1}`}
-                                        value={student.name}
-                                        onChange={(e) => {
-                                            const newStudents = students.map(s => s.id === student.id ? { ...s, name: e.target.value } : s);
-                                            setStudents(newStudents);
-                                        }}
-                                        onPointerDown={(e) => e.stopPropagation()}
-                                    />
-                                </div>
-                            </Reorder.Item>
-                        ))}
+                                </Reorder.Item>
+                            ))}
+                        </AnimatePresence>
                     </Reorder.Group>
                 </section>
 
@@ -473,26 +479,35 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                                             className={`grid gap-4 ${knowledgeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
                                             style={{ '--cols': studentCount } as React.CSSProperties}
                                         >
-                                            {(knowledgeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => {
-                                                const val = students[i].scores[criteria];
-                                                return (
-                                                    <div key={i} className="flex flex-col gap-1">
-                                                        <label className="text-xs truncate font-medium text-[var(--text-secondary)]">
-                                                            {knowledgeMode === 'bulk' ? "Tất cả học sinh" : (students[i].name || `HS ${i + 1}`)}
-                                                        </label>
-                                                        <div className="flex items-center gap-3">
-                                                            <Slider
-                                                                min={1}
-                                                                max={10}
-                                                                value={val}
-                                                                onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
-                                                                className="flex-1"
-                                                            />
-                                                            <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                            <AnimatePresence mode="popLayout" initial={false}>
+                                                {(knowledgeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => {
+                                                    const val = students[i].scores[criteria];
+                                                    return (
+                                                        <motion.div
+                                                            key={i}
+                                                            initial={{ opacity: 0, x: -10 }}
+                                                            animate={{ opacity: 1, x: 0 }}
+                                                            exit={{ opacity: 0, x: -10 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="flex flex-col gap-1"
+                                                        >
+                                                            <label className="text-xs truncate font-medium text-[var(--text-secondary)]">
+                                                                {knowledgeMode === 'bulk' ? "Tất cả học sinh" : (students[i].name || `HS ${i + 1}`)}
+                                                            </label>
+                                                            <div className="flex items-center gap-3">
+                                                                <Slider
+                                                                    min={1}
+                                                                    max={10}
+                                                                    value={val}
+                                                                    onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
+                                                                    className="flex-1"
+                                                                />
+                                                                <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
+                                                            </div>
+                                                        </motion.div>
+                                                    );
+                                                })}
+                                            </AnimatePresence>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -554,37 +569,46 @@ Yêu cầu output (Thân thiện, nhẹ nhàng, từ ngữ đơn giản, KHÔNG 
                                             className={`grid gap-4 ${attitudeMode === 'bulk' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[repeat(var(--cols),minmax(0,1fr))]'}`}
                                             style={{ '--cols': studentCount } as React.CSSProperties}
                                         >
-                                            {(attitudeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => (
-                                                <div key={i} className="flex flex-col gap-2">
-                                                    {!((attitudeMode === 'bulk')) && (
-                                                        <div className="text-xs font-bold text-center text-[var(--text-main)] mb-1">
-                                                            {students[i].name || `HS ${i + 1}`}
-                                                        </div>
-                                                    )}
-                                                    <div className="flex flex-wrap gap-1 justify-center">
-                                                        {ATTITUDE_DATA[category].map(tag => {
-                                                            const isPos = isValidPositive(tag);
-                                                            const isNeg = isValidNegative(tag);
-                                                            const isChecked = students[i].attitudes.includes(tag);
+                                            <AnimatePresence mode="popLayout" initial={false}>
+                                                {(attitudeMode === 'bulk' ? [0] : Array.from({ length: studentCount }, (_, i) => i)).map((i) => (
+                                                    <motion.div
+                                                        key={i}
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        exit={{ opacity: 0, x: -10 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="flex flex-col gap-2"
+                                                    >
+                                                        {!((attitudeMode === 'bulk')) && (
+                                                            <div className="text-xs font-bold text-center text-[var(--text-main)] mb-1">
+                                                                {students[i].name || `HS ${i + 1}`}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-wrap gap-1 justify-center">
+                                                            {ATTITUDE_DATA[category].map(tag => {
+                                                                const isPos = isValidPositive(tag);
+                                                                const isNeg = isValidNegative(tag);
+                                                                const isChecked = students[i].attitudes.includes(tag);
 
-                                                            return (
-                                                                <label key={tag} className={`inline-block px-2 py-1 rounded-[12px] border cursor-pointer select-none text-[0.7rem] transition-all 
+                                                                return (
+                                                                    <label key={tag} className={`inline-block px-2 py-1 rounded-[12px] border cursor-pointer select-none text-[0.7rem] transition-all 
                                                           ${isChecked
-                                                                        ? (isPos ? 'bg-green-500 border-green-500 text-white shadow-sm' : (isNeg ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-sm'))
-                                                                        : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700'
-                                                                    }
+                                                                            ? (isPos ? 'bg-green-500 border-green-500 text-white shadow-sm' : (isNeg ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-sm'))
+                                                                            : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700'
+                                                                        }
                                                       `}>
-                                                                    <input type="checkbox" className="hidden"
-                                                                        checked={isChecked}
-                                                                        onChange={(e) => handleAttitudeChange(tag, e.target.checked, i)}
-                                                                    />
-                                                                    {tag}
-                                                                </label>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                                        <input type="checkbox" className="hidden"
+                                                                            checked={isChecked}
+                                                                            onChange={(e) => handleAttitudeChange(tag, e.target.checked, i)}
+                                                                        />
+                                                                        {tag}
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </AnimatePresence>
                                         </div>
                                     </div>
                                 </motion.div>
