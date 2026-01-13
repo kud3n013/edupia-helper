@@ -13,6 +13,10 @@ export default function LessonPage() {
     const [lateChecked, setLateChecked] = useState(false);
     const [lateValue, setLateValue] = useState("");
 
+    const [earlyLeaveChecked, setEarlyLeaveChecked] = useState(false);
+    const [earlyLeaveName, setEarlyLeaveName] = useState("");
+    const [earlyLeaveType, setEarlyLeaveType] = useState("Có xin phép");
+
     const [sessionNumber, setSessionNumber] = useState(1);
     const [reminders, setReminders] = useState<string[]>([]);
     const [output, setOutput] = useState("");
@@ -70,6 +74,14 @@ export default function LessonPage() {
             sentences.push(`Bạn ${lateValue.trim()} vào muộn`);
         }
 
+        if (earlyLeaveChecked && earlyLeaveName.trim()) {
+            if (earlyLeaveType === "Không phép") {
+                sentences.push(`Bạn ${earlyLeaveName.trim()} thoát lớp trước mà không xin phép`);
+            } else {
+                sentences.push(`Bạn ${earlyLeaveName.trim()} xin phép nghỉ sớm`);
+            }
+        }
+
         let part1Text = "";
         if (sentences.length > 0) {
             part1Text = "1. " + sentences.join(". ") + ".";
@@ -78,9 +90,19 @@ export default function LessonPage() {
         // Mandatory Homework String
         const mandatoryHomework = `BTVN Buổi ${sessionNumber} Tuần ${currentWeek}`;
 
+        // Get current month (1-based)
+        const currentMonth = new Date().getMonth() + 1;
+
+        // Process reminders to add month if needed
+        const processedReminders = reminders.map(r => {
+            if (r === "Bài thi tháng") return `Bài thi tháng ${currentMonth}`;
+            if (r === "Bài tập nói") return `Bài tập nói tháng ${currentMonth}`;
+            return r;
+        });
+
         // Combine mandatory homework with other optional reminders
         // Prioritize optional reminders (Exams, Speaking) before BTVN
-        const allReminders = [...reminders, mandatoryHomework];
+        const allReminders = [...processedReminders, mandatoryHomework];
 
         let part2Text = `2. PH nhớ nhắc các em hoàn thành ${allReminders.join(", ")}.`;
 
@@ -185,6 +207,38 @@ export default function LessonPage() {
                                 placeholder="Tên học sinh..."
                                 className="flex-1 p-3 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] disabled:opacity-50 transition-all shadow-sm"
                             />
+                        </div>
+
+                        {/* Early Leave */}
+                        <div className="flex flex-wrap items-center gap-4">
+                            <label className="flex items-center cursor-pointer min-w-[30px]">
+                                <input
+                                    type="checkbox"
+                                    checked={earlyLeaveChecked}
+                                    onChange={(e) => setEarlyLeaveChecked(e.target.checked)}
+                                    className="w-5 h-5 rounded border-gray-300 accent-[var(--primary-color)] focus:ring-[var(--primary-color)] cursor-pointer"
+                                />
+                            </label>
+                            <label className="min-w-[140px] font-medium">Bạn thoát lớp sớm</label>
+                            <div className="flex-1 flex gap-2">
+                                <input
+                                    type="text"
+                                    value={earlyLeaveName}
+                                    onChange={(e) => setEarlyLeaveName(e.target.value)}
+                                    disabled={!earlyLeaveChecked}
+                                    placeholder="Tên học sinh..."
+                                    className="flex-1 p-3 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] disabled:opacity-50 transition-all shadow-sm"
+                                />
+                                <select
+                                    value={earlyLeaveType}
+                                    onChange={(e) => setEarlyLeaveType(e.target.value)}
+                                    disabled={!earlyLeaveChecked}
+                                    className="w-[150px] p-3 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] disabled:opacity-50 transition-all shadow-sm"
+                                >
+                                    <option value="Có xin phép">Có xin phép</option>
+                                    <option value="Không phép">Không phép</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </section>
