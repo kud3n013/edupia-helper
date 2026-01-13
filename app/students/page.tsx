@@ -66,7 +66,7 @@ interface Student {
     scores: Record<string, number>;
     attitudes: string[];
 }
-
+"Tên HS"
 export default function StudentsPage() {
     // --- State ---
     const [lessonContent, setLessonContent] = useState("");
@@ -405,7 +405,6 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                                     <circle cx="15" cy="5" r="1" />
                                                     <circle cx="15" cy="19" r="1" />
                                                 </svg>
-                                                Học sinh {student.id + 1}
                                             </label>
                                         </div>
                                         <input
@@ -629,28 +628,30 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
             </form>
 
             {/* Output */}
-            {showOutput && (
-                <section id="groupOutputSection" className="glass-panel p-8 mt-8 animate-fade-in">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold">Generated Group Prompts</h2>
-                        <button
-                            type="button"
-                            onClick={() => copyToClipboard(output, () => {
-                                setCopyBtnText("Copied!");
-                                setTimeout(() => setCopyBtnText("Copy All"), 2000);
-                            })}
-                            className={`px-4 py-2 rounded-lg border border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 font-medium transition-colors ${copyBtnText === "Copied!" ? "!bg-[var(--primary-color)] !text-white" : ""
-                                }`}
-                        >
-                            {copyBtnText}
-                        </button>
-                    </div>
-                    <pre className="bg-[#1e1e2e] text-[#e2e8f0] p-6 rounded-lg overflow-x-auto font-mono text-sm whitespace-pre-wrap border border-gray-700 max-h-[600px] overflow-y-auto">
-                        {output}
-                    </pre>
-                </section>
-            )}
+            {
+                showOutput && (
+                    <section id="groupOutputSection" className="glass-panel p-8 mt-8 animate-fade-in">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Generated Group Prompts</h2>
+                            <button
+                                type="button"
+                                onClick={() => copyToClipboard(output, () => {
+                                    setCopyBtnText("Copied!");
+                                    setTimeout(() => setCopyBtnText("Copy All"), 2000);
+                                })}
+                                className={`px-4 py-2 rounded-lg border border-[var(--primary-color)] text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 font-medium transition-colors ${copyBtnText === "Copied!" ? "!bg-[var(--primary-color)] !text-white" : ""
+                                    }`}
+                            >
+                                {copyBtnText}
+                            </button>
+                        </div>
+                        <pre className="bg-[#1e1e2e] text-[#e2e8f0] p-6 rounded-lg overflow-x-auto font-mono text-sm whitespace-pre-wrap border border-gray-700 max-h-[600px] overflow-y-auto">
+                            {output}
+                        </pre>
+                    </section>
+                )
+            }
 
-        </div>
+        </div >
     );
 }
