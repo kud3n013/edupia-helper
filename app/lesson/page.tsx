@@ -7,6 +7,7 @@ import { Reorder, AnimatePresence, motion } from "framer-motion";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
+
 const CRITERIA_LIST = [
     "Từ vựng",
     "Ngữ pháp",
@@ -76,7 +77,11 @@ interface Student {
 
 export default function LessonPage() {
     // --- State: General & Lesson Info ---
+    const [classId, setClassId] = useState("");
+    const [grade, setGrade] = useState<number | null>(null);
+    const [level, setLevel] = useState<string | null>(null);
     const [lessonContent, setLessonContent] = useState("");
+    const lessonContentRef = useRef<HTMLTextAreaElement>(null);
     const [atmosphereChecked, setAtmosphereChecked] = useState(true);
     const [atmosphereValue, setAtmosphereValue] = useState("Sôi nổi");
     const [progressChecked, setProgressChecked] = useState(true);
@@ -149,7 +154,46 @@ export default function LessonPage() {
         fetchUserGender();
         window.addEventListener('resize', checkDesktop);
         return () => window.removeEventListener('resize', checkDesktop);
+        return () => window.removeEventListener('resize', checkDesktop);
     }, []);
+
+    // Adjust textarea height on content change
+    useEffect(() => {
+        if (lessonContentRef.current) {
+            lessonContentRef.current.style.height = "auto";
+            lessonContentRef.current.style.height = lessonContentRef.current.scrollHeight + "px";
+        }
+    }, [lessonContent]);
+
+    // Parse Grade and Level from Class ID
+    useEffect(() => {
+        // Pattern: .[number][letter] e.g. .3A or .5C
+        const match = classId.match(/\.(\d+)([a-zA-Z])/);
+        if (match && match[1]) {
+            // Parse Grade
+            const g = parseInt(match[1], 10);
+            if (!isNaN(g)) {
+                setGrade(g);
+                if (g >= 1 && g <= 5) setSchoolLevel("TH");
+                else if (g >= 6 && g <= 9) setSchoolLevel("THCS");
+            }
+
+            // Parse Level
+            if (match[2]) {
+                const l = match[2].toUpperCase();
+                const levelMap: Record<string, string> = {
+                    'A': 'Giỏi',
+                    'B': 'Khá',
+                    'C': 'Trung bình',
+                    'D': 'Yếu'
+                };
+                setLevel(levelMap[l] || null);
+            }
+        } else {
+            setGrade(null);
+            setLevel(null);
+        }
+    }, [classId]);
 
     // --- Persistence Logic ---
     const [isLoading, setIsLoading] = useState(true);
@@ -175,7 +219,11 @@ export default function LessonPage() {
                     return;
                 }
 
+
                 if (data) {
+                    setClassId(data.class_id || "");
+                    setGrade(data.grade || null);
+                    setLevel(data.level || null);
                     setLessonContent(data.lesson_content || "");
                     setAtmosphereChecked(data.atmosphere_checked ?? true);
                     setAtmosphereValue(data.atmosphere_value || "Sôi nổi");
@@ -215,6 +263,9 @@ export default function LessonPage() {
 
                 const payload = {
                     user_id: user.id,
+                    class_id: classId,
+                    grade: grade,
+                    level: level,
                     lesson_content: lessonContent,
                     atmosphere_checked: atmosphereChecked,
                     atmosphere_value: atmosphereValue,
@@ -248,6 +299,9 @@ export default function LessonPage() {
         return () => clearTimeout(timeoutId);
     }, [
         isLoading,
+        classId,
+        grade,
+        level,
         lessonContent,
         atmosphereChecked,
         atmosphereValue,
@@ -364,6 +418,11 @@ export default function LessonPage() {
 
     // --- Generate Feedback Logic ---
     const generateFeedback = () => {
+        if (!classId.trim()) {
+            alert("Vui lòng nhập mã lớp học!");
+            return;
+        }
+
         if (!lessonContent.trim()) {
             alert("Vui lòng nhập nội dung bài học!");
             return;
@@ -453,7 +512,9 @@ export default function LessonPage() {
 Hãy đóng vai trò là một ${teacherPronoun} giáo tiếng Anh. Dựa trên thông tin dưới đây, hãy viết một đoạn nhận xét ngắn gọn (khoảng 25-50 chữ) bằng tiếng Việt dành cho phụ huynh. Sử dụng ngôn ngữ trực tiếp, thẳng thắn, không dùng lời khen sáo rỗng hay chỉ trích gay gắt.
 ${pronounInstruction}
 
+
 Thông tin:
+- Lớp: ${classId}
 - Tên: ${name}
 - Bài học: ${lessonContent}
 
@@ -497,17 +558,45 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
 
                 {/* SECTION 1: General Info */}
                 <section className="glass-panel p-8">
-                    <h2 className="text-2xl font-bold mb-6 text-[var(--text-main)] border-b-2 border-indigo-500/10 pb-2">
-                        1. Thông tin chung
-                    </h2>
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-indigo-500/10 pb-2">
+                        <h2 className="text-2xl font-bold text-[var(--text-main)]">
+                            1. Thông tin chung
+                        </h2>
+                        <div className="flex gap-2">
+                            {grade && (
+                                <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
+                                    Lớp {grade}
+                                </div>
+                            )}
+                            {level && (
+                                <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
+                                    {level}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Class ID Input */}
+                    <div className="mb-6">
+                        <label htmlFor="classId" className="block mb-2 font-medium">Mã lớp học</label>
+                        <input
+                            type="text"
+                            id="classId"
+                            className="w-full p-3 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all shadow-sm"
+                            placeholder="Ví dụ: KIDS123"
+                            value={classId}
+                            onChange={(e) => setClassId(e.target.value)}
+                        />
+                    </div>
 
                     {/* Lesson Content Input */}
                     <div className="mb-6">
                         <label htmlFor="lessonContent" className="block mb-2 font-medium">Nội dung bài học</label>
                         <textarea
                             id="lessonContent"
-                            className="w-full p-3 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all min-h-[50px] resize-y shadow-sm"
-                            rows={2}
+                            ref={lessonContentRef}
+                            className="w-full p-3 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] transition-all min-h-[50px] resize-none shadow-sm overflow-hidden"
+                            rows={1}
                             placeholder="Ví dụ: Unit 5: Animals..."
                             value={lessonContent}
                             onChange={(e) => setLessonContent(e.target.value)}
@@ -571,19 +660,8 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                         <h2 className="text-2xl font-bold m-0 p-0 text-[var(--text-main)]">
                             2. Danh sách học sinh
                         </h2>
-                        <div className="flex items-center gap-3 text-sm">
-                            <span className="font-semibold text-[var(--text-secondary)]">Cấp học:</span>
-                            <div className="flex bg-black/5 rounded-[20px] p-[3px] shadow-inner dark:bg-white/10">
-                                {['TH', 'THCS'].map((level) => (
-                                    <label key={level} className={`px-3 py-1 cursor-pointer rounded-[16px] text-sm font-semibold transition-all ${schoolLevel === level ? 'bg-[var(--primary-color)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5'}`}>
-                                        <input type="radio" name="school_level" className="hidden"
-                                            checked={schoolLevel === level}
-                                            onChange={() => setSchoolLevel(level as any)}
-                                        />
-                                        {level}
-                                    </label>
-                                ))}
-                            </div>
+                        <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
+                            {schoolLevel === 'TH' ? 'Tiểu học' : 'THCS'}
                         </div>
                     </div>
 
