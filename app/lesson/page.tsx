@@ -151,6 +151,119 @@ export default function LessonPage() {
         return () => window.removeEventListener('resize', checkDesktop);
     }, []);
 
+    // --- Persistence Logic ---
+    const [isLoading, setIsLoading] = useState(true);
+
+    // 1. Fetch data on mount
+    useEffect(() => {
+        const loadLessonData = async () => {
+            try {
+                const { createClient } = await import("@/utils/supabase/client");
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+
+                if (!user) return;
+
+                const { data, error } = await supabase
+                    .from("lessons")
+                    .select("*")
+                    .eq("user_id", user.id)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+                    console.error("Error loading lesson data:", error);
+                    return;
+                }
+
+                if (data) {
+                    setLessonContent(data.lesson_content || "");
+                    setAtmosphereChecked(data.atmosphere_checked ?? true);
+                    setAtmosphereValue(data.atmosphere_value || "Sôi nổi");
+                    setProgressChecked(data.progress_checked ?? true);
+                    setProgressValue(data.progress_value || "Bình thường");
+                    setStudentCount(data.student_count || 4);
+                    setSchoolLevel(data.school_level || "TH");
+                    setKnowledgeMode(data.knowledge_mode || "individual");
+                    setAttitudeMode(data.attitude_mode || "individual");
+                    setIncludedCriteria(data.included_criteria || ["Từ vựng", "Ngữ pháp", "Phản xạ"]);
+                    setIncludedAttitudeCategories(data.included_attitude_categories || ATTITUDE_CATEGORIES);
+                    if (data.students) setStudents(data.students);
+                    setSessionNumber(data.session_number || 1);
+                    setReminders(data.reminders || []);
+                }
+            } catch (err) {
+                console.error("Unexpected error loading data:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadLessonData();
+    }, []);
+
+    // 2. Save data on change (Autosave with debounce)
+    useEffect(() => {
+        if (isLoading) return; // Don't save while loading or if not loaded yet
+
+        const saveData = async () => {
+            try {
+                const { createClient } = await import("@/utils/supabase/client");
+                const supabase = createClient();
+                const { data: { user } } = await supabase.auth.getUser();
+
+                if (!user) return;
+
+                const payload = {
+                    user_id: user.id,
+                    lesson_content: lessonContent,
+                    atmosphere_checked: atmosphereChecked,
+                    atmosphere_value: atmosphereValue,
+                    progress_checked: progressChecked,
+                    progress_value: progressValue,
+                    student_count: studentCount,
+                    school_level: schoolLevel,
+                    knowledge_mode: knowledgeMode,
+                    attitude_mode: attitudeMode,
+                    included_criteria: includedCriteria,
+                    included_attitude_categories: includedAttitudeCategories,
+                    students: students,
+                    session_number: sessionNumber,
+                    reminders: reminders,
+                    updated_at: new Date().toISOString(),
+                };
+
+                const { error } = await supabase
+                    .from("lessons")
+                    .upsert(payload);
+
+                if (error) {
+                    console.error("Error saving lesson data:", error);
+                }
+            } catch (err) {
+                console.error("Unexpected error saving data:", err);
+            }
+        };
+
+        const timeoutId = setTimeout(saveData, 1000); // Debounce 1s
+        return () => clearTimeout(timeoutId);
+    }, [
+        isLoading,
+        lessonContent,
+        atmosphereChecked,
+        atmosphereValue,
+        progressChecked,
+        progressValue,
+        studentCount,
+        schoolLevel,
+        knowledgeMode,
+        attitudeMode,
+        includedCriteria,
+        includedAttitudeCategories,
+        students,
+        sessionNumber,
+        reminders
+    ]);
+
     useEffect(() => {
         const handleWheel = (e: WheelEvent) => {
             if (studentSectionRef.current && studentSectionRef.current.contains(e.target as Node)) {
