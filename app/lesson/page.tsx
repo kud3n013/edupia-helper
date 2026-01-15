@@ -318,6 +318,39 @@ export default function LessonPage() {
         reminders
     ]);
 
+    // --- Rate Calculation Helper ---
+    const calculateRate = (currentStudentCount: number, currentStatus: string, currentPayRate: string = 'D') => {
+        let baseRate = 0;
+
+        // Pay Rate Table
+        const rates: Record<string, { single: number, group4: number, group6?: number }> = {
+            'S+': { single: 85000, group4: 100000, group6: 115000 }, // Extrapolated
+            'A+': { single: 80000, group4: 95000, group6: 110000 },
+            'B+': { single: 60000, group4: 75000, group6: 90000 },
+            'C+': { single: 50000, group4: 65000, group6: 90000 }, // Assuming group6 same or handled
+            'D': { single: 40000, group4: 55000, group6: 55000 },
+        };
+
+        const rateProfile = rates[currentPayRate] || rates['D'];
+
+        if (currentStudentCount === 1) baseRate = rateProfile.single;
+        else if (currentStudentCount <= 4) baseRate = rateProfile.group4;
+        else baseRate = rateProfile.group6 || rateProfile.group4;
+
+        // Status Multiplier
+        let multiplier = 0;
+        switch (currentStatus) {
+            case "Hoàn thành": multiplier = 1; break;
+            case "HS vắng mặt": multiplier = 0.3; break;
+            case "GS vắng mặt": multiplier = -2; break;
+            case "Hủy": multiplier = 0; break;
+            case "Chưa mở lớp": multiplier = 0; break;
+            default: multiplier = 1;
+        }
+
+        return baseRate * multiplier;
+    };
+
     useEffect(() => {
         const handleWheel = (e: WheelEvent) => {
             if (studentSectionRef.current && studentSectionRef.current.contains(e.target as Node)) {
@@ -417,7 +450,7 @@ export default function LessonPage() {
 
 
     // --- Generate Feedback Logic ---
-    const generateFeedback = () => {
+    const generateFeedback = async () => {
         if (!classId.trim()) {
             alert("Vui lòng nhập mã lớp học!");
             return;
@@ -549,11 +582,62 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
         setTimeout(() => {
             document.getElementById("output-section")?.scrollIntoView({ behavior: "smooth" });
         }, 100);
+
+        // --- Save to Records ---
+        try {
+            const { createClient } = await import("@/utils/supabase/client");
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user) {
+                // Get latest pay_rate from previous record or default 'D'
+                let payRate = 'D';
+                const { data: lastRecord } = await supabase
+                    .from('records')
+                    .select('pay_rate')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (lastRecord?.pay_rate) {
+                    payRate = lastRecord.pay_rate;
+                }
+
+                const calculatedRate = calculateRate(studentCount, "Hoàn thành", payRate);
+
+                const recordPayload = {
+                    user_id: user.id,
+                    class_id: classId,
+                    grade: grade || 0,
+                    level: level || '',
+                    student_count: studentCount,
+                    rate: calculatedRate,
+                    status: "Hoàn thành",
+                    class_type: "BU",
+                    feedback_status: "Đã nhận xét",
+                    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+                    pay_rate: payRate
+                };
+
+                const { error: recordError } = await supabase
+                    .from('records')
+                    .insert(recordPayload);
+
+                if (recordError) {
+                    console.error("Error saving record:", recordError);
+                } else {
+                    console.log("Record saved successfully");
+                }
+            }
+        } catch (err) {
+            console.error("Error in record saving:", err);
+        }
     };
 
     return (
-        <div className="animate-fade-in space-y-8 pb-20">
-            <h1 className="text-3xl font-bold text-center mb-8 text-[var(--accent-color)]">Nhận xét buổi học</h1>
+        <div className="container mx-auto p-4 max-w-[900px] animate-fade-in pb-20">
+            <h1 className="text-3xl font-bold text-center mb-8 text-[var(--accent-color)]">Tạo nhận xét</h1>
             <form onSubmit={(e) => { e.preventDefault(); generateFeedback(); }}>
 
                 {/* SECTION 1: General Info */}

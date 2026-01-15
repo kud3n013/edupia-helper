@@ -39,7 +39,7 @@ export default async function RootLayout({
         <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
           <Background />
           {/* Main Content Area */}
-          <main className="flex-1 w-full max-w-[900px] mx-auto py-8 px-4">
+          <main className="flex-1 w-full py-8 md:pl-8 pr-4">
             {children}
           </main>
           <Sidebar isAuthenticated={isAuthenticated} />

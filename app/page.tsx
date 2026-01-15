@@ -10,7 +10,7 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   return (
-    <>
+    <div className="max-w-[900px] mx-auto">
       <header className="text-center mb-8">
         <div className="flex justify-center items-center gap-4 mb-2 relative">
           <h1 className="text-[2.5rem] font-bold text-[var(--primary-color)] shadow-sm leading-tight drop-shadow-sm">
@@ -79,6 +79,6 @@ export default async function Home() {
       </div>
 
       <HomeMenu isAuthenticated={!!user} />
-    </>
+    </div>
   );
 }
