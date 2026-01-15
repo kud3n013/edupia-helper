@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+
 import { copyToClipboard, cn } from "@/lib/utils";
+import { parseClassInfo } from "@/utils/class-utils";
 import { Slider } from "@/components/ui/Slider";
 import { Reorder, AnimatePresence, motion } from "framer-motion";
 
@@ -165,34 +167,26 @@ export default function LessonPage() {
         }
     }, [lessonContent]);
 
-    // Parse Grade and Level from Class ID
+    // Parse Grade, Level, and Type from Class ID
     useEffect(() => {
-        // Pattern: .[number][letter] e.g. .3A or .5C
-        const match = classId.match(/\.(\d+)([a-zA-Z])/);
-        if (match && match[1]) {
-            // Parse Grade
-            const g = parseInt(match[1], 10);
-            if (!isNaN(g)) {
-                setGrade(g);
-                if (g >= 1 && g <= 5) setSchoolLevel("TH");
-                else if (g >= 6 && g <= 9) setSchoolLevel("THCS");
-            }
+        const { grade, level, isGroupClass, maxStudents } = parseClassInfo(classId);
 
-            // Parse Level
-            if (match[2]) {
-                const l = match[2].toUpperCase();
-                const levelMap: Record<string, string> = {
-                    'A': 'Giỏi',
-                    'B': 'Khá',
-                    'C': 'Trung bình',
-                    'D': 'Yếu'
-                };
-                setLevel(levelMap[l] || null);
-            }
-        } else {
-            setGrade(null);
-            setLevel(null);
+        setGrade(grade);
+        setLevel(level);
+
+        if (grade) {
+            if (grade >= 1 && grade <= 5) setSchoolLevel("TH");
+            else if (grade >= 6 && grade <= 9) setSchoolLevel("THCS");
         }
+
+        // Set student count default based on type
+        // Only if not already set manually? Or force it?
+        // User requested: "determine the max fixed number of students"
+        // Let's set the count to match the type default (1 or 4) if it changes?
+        // Or maybe just clamp it?
+        // Simple approach: Set it to maxStudents.
+        setStudentCount(maxStudents);
+
     }, [classId]);
 
     // --- Persistence Logic ---

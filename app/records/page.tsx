@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { parseClassInfo } from "@/utils/class-utils";
 
 // --- Types ---
 interface TeachingRecord {
@@ -63,32 +64,7 @@ const calculateRate = (currentStudentCount: number, currentStatus: string, curre
 };
 
 // --- Helper: Parse Class ID (Ported from Lesson Page) ---
-const parseClassId = (classId: string) => {
-    let grade = 0;
-    let level = "";
-
-    const match = classId.match(/\.(\d+)([a-zA-Z])/);
-    if (match && match[1]) {
-        // Parse Grade
-        const g = parseInt(match[1], 10);
-        if (!isNaN(g)) {
-            grade = g;
-        }
-
-        // Parse Level
-        if (match[2]) {
-            const l = match[2].toUpperCase();
-            const levelMap: Record<string, string> = {
-                'A': 'Giỏi',
-                'B': 'Khá',
-                'C': 'Trung bình',
-                'D': 'Yếu'
-            };
-            level = levelMap[l] || "";
-        }
-    }
-    return { grade, level };
-};
+// MOVED TO @/utils/class-utils.ts
 
 export default function RecordsPage() {
     const [records, setRecords] = useState<TeachingRecord[]>([]);
@@ -205,14 +181,14 @@ export default function RecordsPage() {
         if (!user) return;
 
         // Parse grade and level from class_id
-        const { grade, level } = parseClassId(newRecordData.class_id);
+        const { grade, level, maxStudents } = parseClassInfo(newRecordData.class_id);
 
         const newRecord: Partial<TeachingRecord> = {
             user_id: user.id,
             class_id: newRecordData.class_id,
             grade: grade || 0,
             level: level || "Không xác định",
-            student_count: 1, // Default
+            student_count: maxStudents, // Default based on type
             rate: 0,
             status: newRecordData.status,
             class_type: "BU", // Default
@@ -223,7 +199,7 @@ export default function RecordsPage() {
         };
 
         // Calculate initial rate
-        newRecord.rate = calculateRate(1, newRecordData.status, currentPayRate);
+        newRecord.rate = calculateRate(maxStudents, newRecordData.status, currentPayRate);
 
         const { data, error } = await supabase
             .from("records")
