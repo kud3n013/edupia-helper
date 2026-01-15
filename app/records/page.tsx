@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 // --- Types ---
 interface TeachingRecord {
@@ -31,37 +32,8 @@ const TIME_OPTIONS = [
     "21:00"
 ];
 
-// --- Helper: Rate Calculation (Duplicated from Lesson Page for now, better in util) ---
-const calculateRate = (currentStudentCount: number, currentStatus: string, currentPayRate: string) => {
-    let baseRate = 0;
-
-    const rates: Record<string, { single: number, group4: number, group6?: number }> = {
-        'S+': { single: 85000, group4: 100000, group6: 115000 },
-        'A+': { single: 80000, group4: 95000, group6: 110000 },
-        'B+': { single: 60000, group4: 75000, group6: 90000 },
-        'C+': { single: 50000, group4: 65000, group6: 90000 },
-        'D': { single: 40000, group4: 55000, group6: 55000 },
-    };
-
-    const rateProfile = rates[currentPayRate] || rates['D'];
-
-    if (currentStudentCount === 1) baseRate = rateProfile.single;
-    else if (currentStudentCount <= 4) baseRate = rateProfile.group4;
-    else baseRate = rateProfile.group6 || rateProfile.group4;
-
-    let multiplier = 0;
-    switch (currentStatus) {
-        case "Hoàn thành": multiplier = 1; break;
-        case "HS vắng mặt": multiplier = 0.3; break;
-        case "GS vắng mặt": multiplier = -2; break;
-        case "Hủy": multiplier = 0; break;
-        case "Chưa mở lớp": multiplier = 0; break;
-        case "Feedback trễ": multiplier = 1; break;
-        default: multiplier = 1;
-    }
-
-    return baseRate * multiplier;
-};
+// --- Helper: Rate Calculation ---
+// REMOVED: Logic migrated to Supabase Trigger (calculate_record_fields)
 
 // --- Helper: Parse Class ID (Ported from Lesson Page) ---
 // MOVED TO @/utils/class-utils.ts
@@ -198,8 +170,9 @@ export default function RecordsPage() {
             pay_rate: currentPayRate,
         };
 
-        // Calculate initial rate
-        newRecord.rate = calculateRate(maxStudents, newRecordData.status, currentPayRate);
+
+
+        // Rate is now calculated by Supabase trigger
 
         const { data, error } = await supabase
             .from("records")
@@ -272,73 +245,94 @@ export default function RecordsPage() {
     const updateRecord = async (id: string, updates: Partial<TeachingRecord>) => {
         const supabase = createClient();
 
-        // Optimistic update
+        // Optimistic update (Partial, excluding rate unless we want to impl client-side again or mock it)
+        // For accurate rates, we should wait for DB. But for UX, we can optimistically update other fields.
         setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
 
-        // If status or pay_rate changed, recalculate rate
-        const target = records.find(r => r.id === id);
-        if (target && (updates.status || updates.pay_rate)) {
-            const newStatus = updates.status || target.status;
-            const newPayRate = updates.pay_rate || target.pay_rate;
-            const newRate = calculateRate(target.student_count, newStatus, newPayRate);
-            updates.rate = newRate;
-
-            // Apply calculated rate to optimistic update
-            setRecords(prev => prev.map(r => r.id === id ? { ...r, rate: newRate } : r));
-        }
-
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("records")
             .update(updates)
-            .eq("id", id);
+            .eq("id", id)
+            .select()
+            .single();
 
         if (error) {
             console.error("Error updating record:", error);
             fetchRecords(); // Revert on error
+        } else if (data) {
+            // Update with partial data from DB (which includes calculated rate)
+            setRecords(prev => prev.map(r => r.id === id ? data : r));
         }
     };
 
     const handleGlobalPayRateChange = async (newRate: string) => {
         setCurrentPayRate(newRate);
 
-        // Optimistic bulk update
-        const updatedRecords = records.map(r => {
-            const newIncome = calculateRate(r.student_count, r.status, newRate);
-            return { ...r, pay_rate: newRate, rate: newIncome };
-        });
-        setRecords(updatedRecords);
+        // Optimistic bulk update (Visual only for pay_rate, rate won't update until fetch)
+        // Or we could retain client-calc for optimistic UI? 
+        // User asked to clean up code, so let's rely on refresh or refetch.
+        // Actually, trigger updates database, but we need to fetch fresh data to see new rates.
+        setRecords(prev => prev.map(r => ({ ...r, pay_rate: newRate })));
 
-        // Persist to Supabase (Batch update if possible, or parallel/sequential)
-        // Since Supabase doesn't support bulk update with different regular ID match easily without UPSERT on primary key.
-        // We will use upsert.
         const supabase = createClient();
 
-        // Prepare payload for upsert
-        // We only need to send fields that changed + ID.
-        // Actually for upsert we need all required fields or it might error if default? No, updates existing.
-        // We send: id, pay_rate, rate.
-        const updates = updatedRecords.map(r => ({
+        // We need to update ALL viewed records.
+        // Doing this one-by-one or batch upsert?
+        // Batch upsert is efficient.
+        const updates = records.map(r => ({
             id: r.id,
-            user_id: r.user_id, // Needed for RLS sometimes? No. But good to be safe if upsert needs constraints? 
-            // Actually upsert needs Primary Key.
             pay_rate: newRate,
-            rate: r.rate,
             updated_at: new Date().toISOString()
+            // No need to send rate, trigger handles it.
         }));
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from("records")
-            .upsert(updates);
+            .upsert(updates)
+            .select();
 
         if (error) {
             console.error("Error batch updating pay rates:", error);
-            // Optionally revert?
+            fetchRecords(); // Revert
+        } else if (data) {
+            // Update local state with returned data (containing new rates)
+            // Need to merge based on ID
+            const dataMap = new Map(data.map(d => [d.id, d]));
+            setRecords(prev => prev.map(r => {
+                const updated = dataMap.get(r.id);
+                return updated ? updated : r;
+            }));
         }
     };
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
     };
+
+    // --- Analytics Data ---
+    const totalIncome = useMemo(() => {
+        return filteredRecords.reduce((sum, r) => sum + (r.rate || 0), 0);
+    }, [filteredRecords]);
+
+    const chartData = useMemo(() => {
+        // Group by Date
+        const grouped: Record<string, number> = {};
+        // Sort chronologically for chart
+        const chronoRecords = [...filteredRecords].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        chronoRecords.forEach(r => {
+            // Format date based on view mode? For now just Day.
+            // Maybe shorten it?
+            const d = new Date(r.date);
+            const key = `${d.getDate()}/${d.getMonth() + 1}`; // D/M
+            grouped[key] = (grouped[key] || 0) + (r.rate || 0);
+        });
+
+        return Object.entries(grouped).map(([date, amount]) => ({
+            date,
+            amount
+        }));
+    }, [filteredRecords]);
 
     return (
         <div className="w-full px-4 md:px-8 py-6 animate-fade-in pb-20">
@@ -539,6 +533,54 @@ export default function RecordsPage() {
                     </table>
                 </div>
             </div >
+
+            {/* Analytics Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                {/* Total Summary Card */}
+                <div className="md:col-span-1 glass-panel p-6 flex flex-col justify-center items-center shadow-lg border border-indigo-100 dark:border-indigo-900/50 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <svg className="w-24 h-24 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2 relative z-10">Tổng thu nhập (đang hiển thị)</h3>
+                    <p className="text-4xl font-black text-[var(--primary-color)] relative z-10 tracking-tight">
+                        {formatCurrency(totalIncome)}
+                    </p>
+                </div>
+
+                {/* Chart */}
+                <div className="md:col-span-2 glass-panel p-6 shadow-lg border border-gray-100 dark:border-gray-800">
+                    <h3 className="text-lg font-bold mb-4 text-gray-700 dark:text-gray-200">Biểu đồ thu nhập theo thời gian</h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                                <XAxis
+                                    dataKey="date"
+                                    tick={{ fontSize: 12, fill: '#888' }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    tick={{ fontSize: 12, fill: '#888' }}
+                                    tickFormatter={(val) => `${val / 1000}k`}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                    formatter={(value: any) => [formatCurrency(value), 'Thu nhập']}
+                                />
+                                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill="var(--primary-color)" fillOpacity={0.8} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
 
             {/* Add Record Modal */}
             {isAddModalOpen && (

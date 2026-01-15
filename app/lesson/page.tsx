@@ -312,38 +312,7 @@ export default function LessonPage() {
         reminders
     ]);
 
-    // --- Rate Calculation Helper ---
-    const calculateRate = (currentStudentCount: number, currentStatus: string, currentPayRate: string = 'D') => {
-        let baseRate = 0;
 
-        // Pay Rate Table
-        const rates: Record<string, { single: number, group4: number, group6?: number }> = {
-            'S+': { single: 85000, group4: 100000, group6: 115000 }, // Extrapolated
-            'A+': { single: 80000, group4: 95000, group6: 110000 },
-            'B+': { single: 60000, group4: 75000, group6: 90000 },
-            'C+': { single: 50000, group4: 65000, group6: 90000 }, // Assuming group6 same or handled
-            'D': { single: 40000, group4: 55000, group6: 55000 },
-        };
-
-        const rateProfile = rates[currentPayRate] || rates['D'];
-
-        if (currentStudentCount === 1) baseRate = rateProfile.single;
-        else if (currentStudentCount <= 4) baseRate = rateProfile.group4;
-        else baseRate = rateProfile.group6 || rateProfile.group4;
-
-        // Status Multiplier
-        let multiplier = 0;
-        switch (currentStatus) {
-            case "Hoàn thành": multiplier = 1; break;
-            case "HS vắng mặt": multiplier = 0.3; break;
-            case "GS vắng mặt": multiplier = -2; break;
-            case "Hủy": multiplier = 0; break;
-            case "Chưa mở lớp": multiplier = 0; break;
-            default: multiplier = 1;
-        }
-
-        return baseRate * multiplier;
-    };
 
     useEffect(() => {
         const handleWheel = (e: WheelEvent) => {
@@ -598,15 +567,13 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                     payRate = lastRecord.pay_rate;
                 }
 
-                const calculatedRate = calculateRate(studentCount, "Hoàn thành", payRate);
-
                 const recordPayload = {
                     user_id: user.id,
                     class_id: classId,
                     grade: grade || 0,
                     level: level || '',
                     student_count: studentCount,
-                    rate: calculatedRate,
+                    // rate: calculatedRate, // Trigger calculates this
                     status: "Hoàn thành",
                     class_type: "BU",
                     feedback_status: "Đã nhận xét",
