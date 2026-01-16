@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { motion, AnimatePresence } from "framer-motion";
+import { MonthPicker } from "@/components/MonthPicker";
 
 // --- Types ---
 interface TeachingRecord {
@@ -22,7 +24,7 @@ interface TeachingRecord {
     pay_rate: string;
 }
 
-const PAY_RATES = ["S+", "A+", "B+", "C+", "D"];
+
 const STATUS_OPTIONS = ["Hoàn thành", "HS vắng mặt", "GS vắng mặt", "Hủy", "Chưa mở lớp", "Feedback trễ"];
 const CLASS_TYPES = ["BU", "CN"];
 const FEEDBACK_STATUS_OPTIONS = ["Đã nhận xét", "Chưa nhận xét"];
@@ -42,8 +44,7 @@ export default function RecordsPage() {
     const [records, setRecords] = useState<TeachingRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
-    const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
-    const [currentPayRate, setCurrentPayRate] = useState<string>("B+"); // User preference
+    const [currentPayRate, setCurrentPayRate] = useState<string>("B+"); // User preference - fetched from profile
 
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: keyof TeachingRecord; direction: "asc" | "desc" }>({
@@ -63,8 +64,45 @@ export default function RecordsPage() {
         time_start: "19:00"
     });
 
+
+    // --- Filters State ---
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        month: "", // yyyy-MM
+        grade: "all",
+        level: "all",
+        status: "all",
+        feedback_status: "all",
+        class_type: "all"
+    });
+
+    // Derived unique options for filters
+    const filterOptions = useMemo(() => {
+        const grades = new Set<string>();
+        const levels = new Set<string>();
+        records.forEach(r => {
+            if (r.grade) grades.add(r.grade.toString());
+            if (r.level) levels.add(r.level);
+        });
+        return {
+            grades: Array.from(grades).sort((a, b) => Number(a) - Number(b)),
+            levels: Array.from(levels).sort()
+        };
+    }, [records]);
+
     useEffect(() => {
-        fetchRecords();
+        const initData = async () => {
+            await fetchRecords();
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase.from('profiles').select('pay_rate').eq('id', user.id).single();
+                if (data?.pay_rate) {
+                    setCurrentPayRate(data.pay_rate);
+                }
+            }
+        };
+        initData();
     }, []);
 
     const fetchRecords = async () => {
@@ -92,24 +130,13 @@ export default function RecordsPage() {
 
     // --- Search & Filter ---
     const filteredRecords = records.filter((r) => {
-        // 1. Date Filter
-        const date = new Date(r.date);
-        const now = new Date();
-        let dateMatch = true;
-
-        if (viewMode === "month") {
-            dateMatch = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-        } else if (viewMode === "year") {
-            dateMatch = date.getFullYear() === now.getFullYear();
-        } else if (viewMode === "week") {
-            // Simple week check (Sunday to Saturday)
-            const onejan = new Date(now.getFullYear(), 0, 1);
-            const todayWeek = Math.ceil((((now.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
-            const dateWeek = Math.ceil((((date.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
-            dateMatch = todayWeek === dateWeek && date.getFullYear() === now.getFullYear();
-        }
-
-        if (!dateMatch) return false;
+        // 1. Advanced Filters
+        if (filters.month && !r.date.startsWith(filters.month)) return false;
+        if (filters.grade !== "all" && r.grade?.toString() !== filters.grade) return false;
+        if (filters.level !== "all" && r.level !== filters.level) return false;
+        if (filters.status !== "all" && r.status !== filters.status) return false;
+        if (filters.feedback_status !== "all" && r.feedback_status !== filters.feedback_status) return false;
+        if (filters.class_type !== "all" && r.class_type !== filters.class_type) return false;
 
         // 2. Search Filter
         const searchStr = query.toLowerCase();
@@ -265,45 +292,7 @@ export default function RecordsPage() {
         }
     };
 
-    const handleGlobalPayRateChange = async (newRate: string) => {
-        setCurrentPayRate(newRate);
 
-        // Optimistic bulk update (Visual only for pay_rate, rate won't update until fetch)
-        // Or we could retain client-calc for optimistic UI? 
-        // User asked to clean up code, so let's rely on refresh or refetch.
-        // Actually, trigger updates database, but we need to fetch fresh data to see new rates.
-        setRecords(prev => prev.map(r => ({ ...r, pay_rate: newRate })));
-
-        const supabase = createClient();
-
-        // We need to update ALL viewed records.
-        // Doing this one-by-one or batch upsert?
-        // Batch upsert is efficient.
-        const updates = records.map(r => ({
-            id: r.id,
-            pay_rate: newRate,
-            updated_at: new Date().toISOString()
-            // No need to send rate, trigger handles it.
-        }));
-
-        const { data, error } = await supabase
-            .from("records")
-            .upsert(updates)
-            .select();
-
-        if (error) {
-            console.error("Error batch updating pay rates:", error);
-            fetchRecords(); // Revert
-        } else if (data) {
-            // Update local state with returned data (containing new rates)
-            // Need to merge based on ID
-            const dataMap = new Map(data.map(d => [d.id, d]));
-            setRecords(prev => prev.map(r => {
-                const updated = dataMap.get(r.id);
-                return updated ? updated : r;
-            }));
-        }
-    };
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
@@ -339,9 +328,9 @@ export default function RecordsPage() {
             <h1 className="text-3xl font-bold text-center mb-8 text-[var(--accent-color)]">Quản lý buổi học</h1>
 
             {/* Controls Bar */}
-            <div className="glass-panel p-4 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between sticky top-4 z-10 backdrop-blur-xl">
+            <div className="glass-panel p-3 md:p-4 mb-4 md:mb-6 flex flex-col md:flex-row gap-3 md:gap-4 items-center justify-between sticky top-4 z-10 backdrop-blur-xl">
                 {/* Search */}
-                <div className="relative flex-1 w-full">
+                <div className="relative w-full md:flex-1">
                     <input
                         type="text"
                         placeholder="Tìm kiếm lớp, trình độ, ngày..."
@@ -352,64 +341,141 @@ export default function RecordsPage() {
                     <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
 
-                {/* View Mode */}
-                <div className="flex bg-gray-100 dark:bg-gray-700/50 rounded-lg p-1">
-                    {(["month", "week", "year"] as const).map((m) => (
-                        <button
-                            key={m}
-                            onClick={() => setViewMode(m)}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === m
-                                ? "bg-white dark:bg-gray-600 shadow-sm text-[var(--primary-color)]"
-                                : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                }`}
-                        >
-                            {m === "month" ? "Tháng" : m === "week" ? "Tuần" : "Năm"}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
+                {/* Mobile Row for Filter & Actions */}
+                <div className="flex w-full md:w-auto items-center justify-between md:justify-start gap-3">
+                    {/* Filter Toggle */}
                     <button
-                        onClick={handleDeleteSelected}
-                        disabled={selectedIds.size === 0}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${selectedIds.size > 0
-                            ? "bg-red-50 text-red-600 hover:bg-red-100"
-                            : "bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600"
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`p-2 rounded-lg transition-all flex items-center gap-2 border flex-1 md:flex-none justify-center ${showFilters
+                            ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
+                            : "bg-white/50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                             }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        Xóa {selectedIds.size > 0 ? `(${selectedIds.size})` : ""}
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                        <span className="md:inline text-sm font-medium">Lọc</span>
                     </button>
-                    <button
-                        onClick={handleAddClick}
-                        className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/30"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                        Thêm buổi học
-                    </button>
-                </div>
 
-                {/* Pay Rate Bar */}
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium whitespace-nowrap">Bậc lương:</span>
-                    <div className="relative">
-                        <select
-                            value={currentPayRate}
-                            onChange={(e) => handleGlobalPayRateChange(e.target.value)}
-                            className="appearance-none font-bold text-sm px-4 py-2 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700 transition-all border-0 text-center w-20"
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDeleteSelected}
+                            disabled={selectedIds.size === 0}
+                            title={selectedIds.size > 0 ? `Xóa ${selectedIds.size} đã chọn` : "Xóa"}
+                            className={`w-10 h-10 rounded-full transition-all flex items-center justify-center ${selectedIds.size > 0
+                                ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                                : "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600"
+                                }`}
                         >
-                            {PAY_RATES.map((rate) => (
-                                <option key={rate} value={rate}>{rate}</option>
-                            ))}
-                        </select>
-                        {/* Custom Arrow because appearance-none removes it */}
-                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                        </div>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                        <button
+                            onClick={handleAddClick}
+                            title="Thêm buổi học"
+                            className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 w-10 h-10 rounded-full transition-all flex items-center justify-center shadow-lg shadow-indigo-500/30"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
                     </div>
                 </div>
             </div>
+
+            {/* Filter Panel */}
+            <AnimatePresence>
+                {showFilters && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0, marginBottom: 0, overflow: "hidden" }}
+                        animate={{
+                            height: "auto",
+                            opacity: 1,
+                            marginBottom: 24,
+                            transitionEnd: { overflow: "visible" }
+                        }}
+                        exit={{ height: 0, opacity: 0, marginBottom: 0, overflow: "hidden" }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="glass-panel border border-gray-200 dark:border-gray-700 relative z-[1]"
+                    >
+                        <div className="p-3 md:p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
+                            {/* Month Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Tháng / Năm</label>
+                                <MonthPicker
+                                    value={filters.month}
+                                    onChange={(val) => setFilters({ ...filters, month: val })}
+                                />
+                            </div>
+
+                            {/* Grade Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Cấp lớp</label>
+                                <select
+                                    value={filters.grade}
+                                    onChange={(e) => setFilters({ ...filters, grade: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {filterOptions.grades.map(g => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Level Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Trình độ</label>
+                                <select
+                                    value={filters.level}
+                                    onChange={(e) => setFilters({ ...filters, level: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {filterOptions.levels.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Status Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Trạng thái</label>
+                                <select
+                                    value={filters.status}
+                                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Feedback Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Feedback</label>
+                                <select
+                                    value={filters.feedback_status}
+                                    onChange={(e) => setFilters({ ...filters, feedback_status: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {FEEDBACK_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Reset Button */}
+                            <div className="flex items-end">
+                                <button
+                                    onClick={() => setFilters({
+                                        month: "",
+                                        grade: "all",
+                                        level: "all",
+                                        status: "all",
+                                        feedback_status: "all",
+                                        class_type: "all"
+                                    })}
+                                    className="w-full p-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                >
+                                    Xóa bộ lọc
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Table */}
             <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative">
@@ -537,7 +603,7 @@ export default function RecordsPage() {
             {/* Analytics Section */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                 {/* Total Summary Card */}
-                <div className="md:col-span-1 glass-panel p-6 flex flex-col justify-center items-center shadow-lg border border-indigo-100 dark:border-indigo-900/50 relative overflow-hidden group">
+                <div className="md:col-span-1 glass-panel p-4 md:p-6 flex flex-col justify-center items-center shadow-lg border border-indigo-100 dark:border-indigo-900/50 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <svg className="w-24 h-24 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
@@ -548,7 +614,7 @@ export default function RecordsPage() {
                 </div>
 
                 {/* Chart */}
-                <div className="md:col-span-2 glass-panel p-6 shadow-lg border border-gray-100 dark:border-gray-800">
+                <div className="md:col-span-2 glass-panel p-4 md:p-6 shadow-lg border border-gray-100 dark:border-gray-800">
                     <h3 className="text-lg font-bold mb-4 text-gray-700 dark:text-gray-200">Biểu đồ thu nhập theo thời gian</h3>
                     <div className="h-[250px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
