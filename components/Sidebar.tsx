@@ -24,7 +24,8 @@ export function Sidebar({ isAuthenticated }: { isAuthenticated: boolean }) {
     const navItems = [
         { name: "Trang chủ", path: "/", icon: <HomeIcon /> },
         { name: "Buổi học", path: "/lesson", icon: <BookOpen />, protected: true },
-        { name: "Quản lý", path: "/records", icon: <ClipboardList />, protected: true },
+        { name: "Sổ dạy", path: "/records", icon: <ClipboardList />, protected: true },
+        { name: "Lớp CN", path: "/classes", icon: <UsersIcon />, protected: true },
     ];
 
     const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
@@ -135,6 +136,17 @@ function ChevronsLeft() {
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="11 17 6 12 11 7" />
             <polyline points="18 17 13 12 18 7" />
+        </svg>
+    )
+}
+
+function UsersIcon() {
+    return (
+        <svg suppressHydrationWarning xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
     )
 }

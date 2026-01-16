@@ -74,6 +74,35 @@ export function HomeMenu({ isAuthenticated }: { isAuthenticated: boolean }) {
                         Xem lịch sử, tính lương, và quản lý các buổi dạy.
                     </p>
                 </Link>
+
+                <Link
+                    href={isAuthenticated ? "/classes" : "#"}
+                    onClick={handleClick}
+                    className="bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)] rounded-[var(--radius-lg)] p-8 text-[var(--text-main)] w-[300px] flex flex-col items-center text-center transition-all duration-300 shadow-[var(--shadow-custom-lg)] hover:-translate-y-[5px] hover:bg-white/90 dark:hover:bg-slate-800/90 hover:border-[var(--primary-color)] group"
+                >
+                    <svg
+                        suppressHydrationWarning
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-16 h-16 stroke-[var(--primary-color)] mb-4"
+                    >
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <h2 className="mb-2 text-[var(--primary-color)] text-xl font-bold">
+                        Quản lý lớp CN
+                    </h2>
+                    <p className="text-[var(--text-secondary)] text-sm">
+                        Danh sách lớp cố định, học sinh và lịch học.
+                    </p>
+                </Link>
             </div>
 
             <LoginRequirementModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />

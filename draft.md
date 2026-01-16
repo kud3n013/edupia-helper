@@ -21,3 +21,5 @@ Right side of the search bar is a View bar for month, week or year view. Month i
 Next to it is "Bậc lương" [pay_rate] bar, where user can select from S+ to D. A+ have 80.000 VND for 1 on 1 class, 95.000 VND for 1 on 4 class, 110.000 VND for 1 on 6 class. B+ have 60.000 VND for 1 on 1 class, 75.000 VND for 1 on 4 class, 90.000 VND for 1 on 6 class. C+ have 50.000 VND for 1 on 1 class, 65.000 VND for 1 on 4 class. D have 40.000 VND for 1 on 1 class, 55.000 VND for 1 on 4 class. The pay_rate is saved to the database. 
 
 Of course, on Supabase, there should be uuid of each user for each record, so the client can know which record will be displayed to which user.
+
+

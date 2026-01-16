@@ -181,6 +181,30 @@ export default function RecordsPage() {
         // Parse grade and level from class_id
         const { grade, level, maxStudents } = parseClassInfo(newRecordData.class_id);
 
+        // Check if this class exists in 'classes' table to determine type (CN vs BU)
+        // Heuristic: If class_id is "R4.3C.065061-10", we look for fixed_class_id "R4.3C.065061"
+        let computedType = "BU";
+        if (newRecordData.class_id.includes("-")) {
+            // Assume format matches [fixed_id]-[number]
+            // We'll try to match the longest prefix first or just split by last hyphen
+            const parts = newRecordData.class_id.split("-");
+            if (parts.length >= 2) {
+                // Remove the last part (the session number) to get potential Fixed ID
+                const potentialFixedId = newRecordData.class_id.substring(0, newRecordData.class_id.lastIndexOf("-"));
+
+                const { data: classExists } = await supabase
+                    .from("classes")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .eq("fixed_class_id", potentialFixedId)
+                    .maybeSingle();
+
+                if (classExists) {
+                    computedType = "CN";
+                }
+            }
+        }
+
         const newRecord: Partial<TeachingRecord> = {
             user_id: user.id,
             class_id: newRecordData.class_id,
@@ -189,7 +213,7 @@ export default function RecordsPage() {
             student_count: maxStudents, // Default based on type
             rate: 0,
             status: newRecordData.status,
-            class_type: "BU", // Default
+            class_type: computedType as any, // 'CN' or 'BU'
             feedback_status: newRecordData.feedback_status as any,
             date: newRecordData.date,
             time_start: newRecordData.time_start,
@@ -546,15 +570,14 @@ export default function RecordsPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <button
-                                                onClick={() => updateRecord(record.id, { class_type: record.class_type === "BU" ? "CN" : "BU" })}
-                                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${record.class_type === "BU"
-                                                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
-                                                    : "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:hover:bg-purple-500/20"
+                                            <span
+                                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all inline-block ${record.class_type === "BU"
+                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                                                    : "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
                                                     }`}
                                             >
                                                 {record.class_type}
-                                            </button>
+                                            </span>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="relative">
