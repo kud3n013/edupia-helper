@@ -34,16 +34,17 @@ export default async function RootLayout({
       <body
         className={`${beVietnamPro.variable} font-sans antialiased`}
       >
-        <SmoothScrolling />
-        <FaviconManager />
-        <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
-          <Background />
-          {/* Main Content Area */}
-          <main className="flex-1 w-full py-8 px-4 md:px-8">
-            {children}
-          </main>
-          <Sidebar isAuthenticated={isAuthenticated} />
-        </div>
+        <SmoothScrolling>
+          <FaviconManager />
+          <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
+            <Background />
+            {/* Main Content Area */}
+            <main className="flex-1 w-full py-8 px-4 md:px-8">
+              {children}
+            </main>
+            <Sidebar isAuthenticated={isAuthenticated} />
+          </div>
+        </SmoothScrolling>
       </body>
     </html>
   );

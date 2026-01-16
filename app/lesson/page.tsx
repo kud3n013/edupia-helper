@@ -6,6 +6,7 @@ import { copyToClipboard, cn } from "@/lib/utils";
 import { parseClassInfo } from "@/utils/class-utils";
 import { Slider } from "@/components/ui/Slider";
 import { Reorder, AnimatePresence, motion } from "framer-motion";
+import { useLenis } from "@/components/SmoothScrolling";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
@@ -78,6 +79,9 @@ interface Student {
 }
 
 export default function LessonPage() {
+    // --- Hooks ---
+    const lenis = useLenis();
+
     // --- State: General & Lesson Info ---
     const [classId, setClassId] = useState("");
     const [grade, setGrade] = useState<number | null>(null);
@@ -411,6 +415,42 @@ export default function LessonPage() {
         ].includes(tag);
     };
 
+    const handleReset = () => {
+        if (!confirm("Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu về mặc định?")) return;
+
+        // Scroll to top
+        lenis?.scrollTo(0, { immediate: false });
+
+        setClassId("");
+        setLessonContent("");
+        setAtmosphereChecked(true);
+        setAtmosphereValue("Sôi nổi");
+        setProgressChecked(true);
+        setProgressValue("Bình thường");
+        setStudentCount(4);
+        setSchoolLevel("TH");
+        setKnowledgeMode("individual");
+        setAttitudeMode("individual");
+        setIncludedCriteria(["Từ vựng", "Ngữ pháp", "Phản xạ"]);
+        setIncludedAttitudeCategories(ATTITUDE_CATEGORIES);
+        setStudents(Array.from({ length: MAX_STUDENTS }, (_, i) => ({
+            id: i,
+            name: "",
+            scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
+            attitudes: [],
+        })));
+        setSessionNumber(1);
+        setReminders([]);
+        setClassReport("");
+    };
+
+    const scrollToSection = (id: string) => {
+        const element = document.getElementById(id);
+        if (element && lenis) {
+            lenis.scrollTo(element, { offset: -100 });
+        }
+    };
+
 
     // --- Generate Feedback Logic ---
     const generateFeedback = async () => {
@@ -601,8 +641,45 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
             <h1 className="text-3xl font-bold text-center mb-8 text-[var(--accent-color)]">Tạo nhận xét</h1>
             <form onSubmit={(e) => { e.preventDefault(); generateFeedback(); }}>
 
+                {/* Controls Bar */}
+                <div className="glass-panel p-3 md:p-4 mb-8 flex flex-col md:flex-row items-center justify-between sticky top-4 z-20 backdrop-blur-xl gap-4">
+                    {/* Navigation Buttons */}
+                    <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 md:pb-0">
+                        {[1, 2, 3, 4, 5].map((num) => (
+                            <button
+                                key={num}
+                                type="button"
+                                onClick={() => scrollToSection(`section-${num}`)}
+                                className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 hover:bg-[var(--primary-color)] hover:text-white hover:border-[var(--primary-color)] transition-all font-bold text-sm md:text-base flex items-center justify-center shadow-sm"
+                            >
+                                {num}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleReset}
+                            className="px-4 md:px-6 py-2 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/30 dark:hover:bg-red-900/20 font-bold text-sm transition-all flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" /><path d="M3 3v9h9" /></svg>
+                            <span className="hidden md:inline">Đặt lại</span>
+                        </button>
+
+                        <button
+                            type="submit"
+                            className="px-6 py-2 rounded-full bg-[var(--primary-color)] text-white font-bold text-sm transform hover:-translate-y-0.5 hover:bg-[var(--primary-hover)] shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+                            Tạo Feedback
+                        </button>
+                    </div>
+                </div>
+
                 {/* SECTION 1: General Info */}
-                <section className="glass-panel p-8">
+                <section id="section-1" className="glass-panel p-8">
                     <div className="flex justify-between items-center mb-6 border-b-2 border-indigo-500/10 pb-2">
                         <h2 className="text-2xl font-bold text-[var(--text-main)]">
                             1. Thông tin chung
@@ -700,7 +777,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 </section>
 
                 {/* SECTION 2: Student List */}
-                <section className="glass-panel p-8 mt-8">
+                <section id="section-2" className="glass-panel p-8 mt-8">
                     <div className="flex justify-between items-center mb-6 pb-2 border-b-2 border-indigo-500/10">
                         <h2 className="text-2xl font-bold m-0 p-0 text-[var(--text-main)]">
                             2. Danh sách học sinh
@@ -715,13 +792,6 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                             <label htmlFor="studentCountInput" className="font-medium m-0">Số lượng học sinh:</label>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setStudentCount(Math.max(1, studentCount - 1))}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /></svg>
-                            </button>
                             <input
                                 type="number"
                                 id="studentCountInput"
@@ -736,13 +806,6 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                 }}
                                 className="w-20 text-center p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] font-bold text-lg"
                             />
-                            <button
-                                type="button"
-                                onClick={() => setStudentCount(Math.min(6, studentCount + 1))}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-                            </button>
                         </div>
                     </div>
 
@@ -799,7 +862,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 </section>
 
                 {/* SECTION 3: Knowledge */}
-                <section className="glass-panel p-8 mt-8">
+                <section id="section-3" className="glass-panel p-8 mt-8">
                     <div className="flex justify-between items-center mb-6 pb-2 border-b-2 border-indigo-500/10 flex-wrap gap-4">
                         <h2 className="text-2xl font-bold m-0 p-0 text-[var(--text-main)]">3. Tiếp thu kiến thức</h2>
                         <div className="flex items-center gap-3 text-sm">
@@ -887,7 +950,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 </section>
 
                 {/* SECTION 4: Attitude */}
-                <section className="glass-panel p-8 mt-8">
+                <section id="section-4" className="glass-panel p-8 mt-8">
                     <div className="flex justify-between items-center mb-6 pb-2 border-b-2 border-indigo-500/10 flex-wrap gap-4">
                         <h2 className="text-2xl font-bold m-0 p-0 text-[var(--text-main)]">4. Thái độ học tập</h2>
                         <div className="flex items-center gap-3 text-sm">
@@ -986,7 +1049,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 </section>
 
                 {/* SECTION 5: Reminders */}
-                <section className="glass-panel p-8 mt-8">
+                <section id="section-5" className="glass-panel p-8 mt-8">
                     <div className="flex justify-between items-center mb-6 border-b-2 border-indigo-500/10 pb-2">
                         <h2 className="text-2xl font-bold text-[var(--text-main)]">
                             5. Nhắc nhở phụ huynh
@@ -1036,15 +1099,6 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                         </div>
                     </div>
                 </section>
-
-                <div className="flex justify-center mt-8">
-                    <button
-                        type="submit"
-                        className="px-8 py-3 rounded-lg bg-[var(--primary-color)] text-white font-semibold transform hover:-translate-y-0.5 hover:bg-[var(--primary-hover)] shadow-lg hover:shadow-xl transition-all"
-                    >
-                        Tạo Feedback
-                    </button>
-                </div>
             </form>
 
             {showOutput && (
@@ -1091,7 +1145,8 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                         </pre>
                     </section>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

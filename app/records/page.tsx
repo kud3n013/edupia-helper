@@ -5,7 +5,6 @@ import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
-import { MonthPicker } from "@/components/MonthPicker";
 
 // --- Types ---
 interface TeachingRecord {
@@ -68,7 +67,7 @@ export default function RecordsPage() {
     // --- Filters State ---
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
-        month: "", // yyyy-MM
+        month: new Date().toISOString().slice(0, 7), // yyyy-MM
         grade: "all",
         level: "all",
         status: "all",
@@ -398,9 +397,11 @@ export default function RecordsPage() {
                             {/* Month Filter */}
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Tháng / Năm</label>
-                                <MonthPicker
+                                <input
+                                    type="month"
                                     value={filters.month}
-                                    onChange={(val) => setFilters({ ...filters, month: val })}
+                                    onChange={(e) => setFilters({ ...filters, month: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
                                 />
                             </div>
 
@@ -478,7 +479,7 @@ export default function RecordsPage() {
             </AnimatePresence>
 
             {/* Table */}
-            <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative">
+            <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
