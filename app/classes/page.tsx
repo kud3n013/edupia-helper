@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,7 @@ interface ClassRecord {
     students: string[]; // List of student names
     schedule: string[]; // Weekdays e.g. ["T2", "T5"]
     time: string; // e.g. "19h30"
-    finished?: number; // Computed column
+    finished_lesson: number;
 }
 
 const SCHEDULE_OPTIONS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -29,7 +29,14 @@ export default function ClassesPage() {
     const [classes, setClasses] = useState<ClassRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
-    const [filterState, setFilterState] = useState<"Đang dạy" | "Kết thúc" | "all">("Đang dạy");
+
+    // Filters State
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        grade: "all",
+        level: "all",
+        state: "Đang dạy" as "Đang dạy" | "Kết thúc" | "all"
+    });
 
     // Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -40,6 +47,8 @@ export default function ClassesPage() {
         time: "19h00",
         students: [] as string[] // Initial empty list
     });
+
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Expanded Rows for Student Editing
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -52,11 +61,14 @@ export default function ClassesPage() {
         setLoading(true);
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
         const { data, error } = await supabase
             .from("classes")
-            .select("*, finished")
+            .select("*, finished_lesson")
             .eq("user_id", user.id)
             .order("fixed_class_id", { ascending: true }); // Sort by Class ID by default
 
@@ -68,7 +80,7 @@ export default function ClassesPage() {
                     ...d,
                     students: Array.isArray(d.students) ? d.students : [],
                     schedule: Array.isArray(d.schedule) ? d.schedule : [],
-                    finished: d.finished || 0
+                    finished_lesson: d.finished_lesson || 0
                 }));
                 setClasses(parsedData);
             }
@@ -76,9 +88,25 @@ export default function ClassesPage() {
         setLoading(false);
     };
 
+    // Derived unique options for filters
+    const filterOptions = useMemo(() => {
+        const grades = new Set<string>();
+        const levels = new Set<string>();
+        classes.forEach(c => {
+            if (c.grade) grades.add(c.grade.toString());
+            if (c.level) levels.add(c.level);
+        });
+        return {
+            grades: Array.from(grades).sort((a, b) => Number(a) - Number(b)),
+            levels: Array.from(levels).sort()
+        };
+    }, [classes]);
+
     // --- Search & Filter ---
     const filteredClasses = classes.filter((c) => {
-        if (filterState !== "all" && c.state !== filterState) return false;
+        if (filters.state !== "all" && c.state !== filters.state) return false;
+        if (filters.grade !== "all" && c.grade?.toString() !== filters.grade) return false;
+        if (filters.level !== "all" && c.level !== filters.level) return false;
 
         const searchStr = query.toLowerCase();
         return (
@@ -87,6 +115,44 @@ export default function ClassesPage() {
             (c.level || "").toLowerCase().includes(searchStr)
         );
     });
+
+    // --- Actions ---
+    const handleDeleteSelected = async () => {
+        if (selectedIds.size === 0) return;
+        if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} lớp đã chọn?`)) return;
+
+        const supabase = createClient();
+        const { error } = await supabase
+            .from("classes")
+            .delete()
+            .in("id", Array.from(selectedIds));
+
+        if (error) {
+            console.error("Error deleting classes:", error);
+            alert("Lỗi khi xóa dữ liệu.");
+        } else {
+            setClasses(prev => prev.filter(c => !selectedIds.has(c.id)));
+            setSelectedIds(new Set());
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredClasses.length && filteredClasses.length > 0) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredClasses.map(c => c.id)));
+        }
+    };
+
+    const toggleSelectRow = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
 
     // --- Actions ---
     const handleSaveNewClass = async () => {
@@ -292,25 +358,114 @@ export default function ClassesPage() {
 
                 {/* Filter and Actions */}
                 <div className="flex w-full md:w-auto items-center justify-between md:justify-start gap-3">
-                    <select
-                        value={filterState}
-                        onChange={(e) => setFilterState(e.target.value as any)}
-                        className="p-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-sm font-medium focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                    >
-                        <option value="Đang dạy">Đang dạy</option>
-                        <option value="Kết thúc">Kết thúc</option>
-                        <option value="all">Tất cả</option>
-                    </select>
-
+                    {/* Filter Toggle */}
                     <button
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 px-4 py-2 rounded-full transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/30 font-bold text-sm"
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`p-2 rounded-lg transition-all flex items-center gap-2 border flex-1 md:flex-none justify-center ${showFilters
+                            ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
+                            : "bg-white/50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            }`}
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-                        <span className="hidden md:inline">Thêm lớp</span>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+                        <span className="md:inline text-sm font-medium">Lọc</span>
                     </button>
+
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDeleteSelected}
+                            disabled={selectedIds.size === 0}
+                            title={selectedIds.size > 0 ? `Xóa ${selectedIds.size} đã chọn` : "Xóa"}
+                            className={`w-10 h-10 rounded-full transition-all flex items-center justify-center ${selectedIds.size > 0
+                                ? "bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400"
+                                : "bg-gray-100 text-gray-300 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600"
+                                }`}
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                        <button
+                            onClick={() => setIsAddModalOpen(true)}
+                            title="Thêm lớp"
+                            className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 w-10 h-10 rounded-full transition-all flex items-center justify-center shadow-lg shadow-indigo-500/30"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* Filter Panel */}
+            <AnimatePresence>
+                {showFilters && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0, marginBottom: 0, overflow: "hidden" }}
+                        animate={{
+                            height: "auto",
+                            opacity: 1,
+                            marginBottom: 24,
+                            transitionEnd: { overflow: "visible" }
+                        }}
+                        exit={{ height: 0, opacity: 0, marginBottom: 0, overflow: "hidden" }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="glass-panel border border-gray-200 dark:border-gray-700 relative z-[1]"
+                    >
+                        <div className="p-3 md:p-4 grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+                            {/* Grade Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Cấp lớp</label>
+                                <select
+                                    value={filters.grade}
+                                    onChange={(e) => setFilters({ ...filters, grade: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {filterOptions.grades.map(g => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Level Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Trình độ</label>
+                                <select
+                                    value={filters.level}
+                                    onChange={(e) => setFilters({ ...filters, level: e.target.value })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="all">Tất cả</option>
+                                    {filterOptions.levels.map(l => <option key={l} value={l}>{l}</option>)}
+                                </select>
+                            </div>
+
+                            {/* Status Filter */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1">Trạng thái</label>
+                                <select
+                                    value={filters.state}
+                                    onChange={(e) => setFilters({ ...filters, state: e.target.value as any })}
+                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 text-sm p-2 bg-white dark:bg-gray-800 focus:ring-1 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    <option value="Đang dạy">Đang dạy</option>
+                                    <option value="Kết thúc">Kết thúc</option>
+                                    <option value="all">Tất cả</option>
+                                </select>
+                            </div>
+
+                            {/* Reset Button */}
+                            <div className="flex items-end">
+                                <button
+                                    onClick={() => setFilters({
+                                        grade: "all",
+                                        level: "all",
+                                        state: "all"
+                                    })}
+                                    className="w-full p-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                >
+                                    Xóa bộ lọc
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Table */}
             <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
@@ -318,6 +473,14 @@ export default function ClassesPage() {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
                             <tr>
+                                <th className="px-4 py-3 w-10">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.size === filteredClasses.length && filteredClasses.length > 0}
+                                        onChange={toggleSelectAll}
+                                        className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
+                                    />
+                                </th>
                                 <th className="px-4 py-3">Mã lớp</th>
                                 <th className="px-4 py-3">Lớp</th>
                                 <th className="px-4 py-3">Trình độ</th>
@@ -330,19 +493,27 @@ export default function ClassesPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                             {loading ? (
-                                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
+                                <tr><td colSpan={8} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
                             ) : filteredClasses.length === 0 ? (
-                                <tr><td colSpan={7} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
+                                <tr><td colSpan={8} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
                             ) : (
                                 filteredClasses.map((cls) => (
                                     <>
-                                        <tr key={cls.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                        <tr key={cls.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedIds.has(cls.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(cls.id)}
+                                                    onChange={() => toggleSelectRow(cls.id)}
+                                                    className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 font-medium">{cls.fixed_class_id}</td>
                                             <td className="px-4 py-3">{cls.grade}</td>
                                             <td className="px-4 py-3">{cls.level}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className="inline-block px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-bold text-xs border border-green-200 dark:border-green-800">
-                                                    {cls.finished} buổi
+                                                    {cls.finished_lesson} buổi
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3">
