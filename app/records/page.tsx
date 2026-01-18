@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 // --- Types ---
 interface TeachingRecord {
@@ -28,9 +29,8 @@ const STATUS_OPTIONS = ["Hoàn thành", "HS vắng mặt", "GS vắng mặt", "H
 const CLASS_TYPES = ["BU", "CN"];
 const FEEDBACK_STATUS_OPTIONS = ["Đã nhận xét", "Chưa nhận xét"];
 const TIME_OPTIONS = [
-    "19:00", "19:15", "19:30", "19:45",
-    "20:00", "20:15", "20:30", "20:45",
-    "21:00"
+    "18:30", "19:00", "19:30",
+    "20:00", "20:30", "21:00"
 ];
 
 // --- Helper: Rate Calculation ---
@@ -40,6 +40,7 @@ const TIME_OPTIONS = [
 // MOVED TO @/utils/class-utils.ts
 
 export default function RecordsPage() {
+    const router = useRouter();
     const [records, setRecords] = useState<TeachingRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
@@ -544,7 +545,18 @@ export default function RecordsPage() {
                                                 className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
                                             />
                                         </td>
-                                        <td className="px-4 py-3 font-medium">{record.class_id}</td>
+                                        <td className="px-4 py-3 font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => router.push(`/lesson?classId=${record.class_id}`)}
+                                                    className="p-1.5 text-gray-500 hover:text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-all"
+                                                    title="Chỉnh sửa feedback"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                                                </button>
+                                                {record.class_id}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3">{record.grade}</td>
                                         <td className="px-4 py-3">{record.level}</td>
                                         <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]">

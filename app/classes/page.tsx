@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -498,7 +498,7 @@ export default function ClassesPage() {
                                 <tr><td colSpan={8} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
                             ) : (
                                 filteredClasses.map((cls) => (
-                                    <>
+                                    <Fragment key={cls.id}>
                                         <tr key={cls.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedIds.has(cls.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
                                             <td className="px-4 py-3">
                                                 <input
@@ -548,7 +548,7 @@ export default function ClassesPage() {
                                                 </tr>
                                             )}
                                         </AnimatePresence>
-                                    </>
+                                    </Fragment>
                                 ))
                             )}
                         </tbody>

@@ -23,3 +23,18 @@ Next to it is "Bậc lương" [pay_rate] bar, where user can select from S+ to D
 Of course, on Supabase, there should be uuid of each user for each record, so the client can know which record will be displayed to which user.
 
 
+## 
+In lesson page, when input the class_id. It should check if the public.records already have that class_id lesson. If yes, warns the users that it has already been given feedback to. 
+
+Recreate every columns from lesson page (public.lessons) that are responsible for storing the input information on that page into table on public.records. When click on "Tạo feedback" those information will be saved to public.records as well. 
+
+Upon warning for duplicate feedback, the lesson page also ask user if they want to load the old feedback (if exists only, before this implementation there is no data available). Then utilize the columns that I just asked you to add to load back to old feedback ì user choose yes "Đồng ý", otherwise "Thôi khỏi, cảm ơn", let users edit as is. 
+
+The lesson feedback with the same class_id will overide the old one in public.records when click "Tạo feedback". At that step, before performing the overide and generate the feedback. The web page has to warn the user one more time about the possible overide. 
+
+In record page, right next to (the left) of each class_id is an edit button to access and edit the old feedback information.
+
+
+## Pre-filled names
+
+In lesson page, when input the class_id. It should check if the public.classes for the fixed_class_id that fit the class_id in the sequence `[fixed_class_id]-[number]` exists. If yes, it will automatically pre-fill the names of the students in the class into the lesson page. 
