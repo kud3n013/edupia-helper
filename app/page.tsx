@@ -3,6 +3,7 @@ import { signOut } from "./auth/login/actions";
 import Link from "next/link";
 import { HomeMenu } from "@/components/HomeMenu";
 import { PayRateSelector } from "@/components/PayRateSelector";
+import { AgendaView } from "@/components/AgendaView";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -18,6 +19,13 @@ export default async function Home() {
     // Actually, usually we might joining query, but separate fetch is fine for now
     const { data } = await supabase.from('profiles').select('pay_rate').eq('id', user.id).single();
     profile = data;
+  }
+
+  /* Fetch Classes for Agenda */
+  let classes: any[] = [];
+  if (user) {
+    const { data } = await supabase.from('classes').select('*').eq('user_id', user.id);
+    classes = data || [];
   }
 
   return (
@@ -100,6 +108,23 @@ export default async function Home() {
       </div>
 
       <HomeMenu isAuthenticated={!!user} />
+
+      {user && (
+        <div className="mt-12 animate-fade-in">
+          <h2 className="text-xl font-bold text-[var(--text-main)] mb-6 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--primary-color)]"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            Lịch biểu trong tuần
+          </h2>
+
+          {classes.length > 0 ? (
+            <div className="mb-8">
+              <AgendaView classes={classes} compact={true} />
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 py-8 glass-panel rounded-xl">Chưa có lịch dạy nào.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

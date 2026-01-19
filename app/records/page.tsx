@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { parseClassInfo } from "@/utils/class-utils";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Legend, Cell } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +51,9 @@ export default function RecordsPage() {
         key: "date",
         direction: "desc",
     });
+
+    // View Mode
+    const [viewMode, setViewMode] = useState<"list" | "analytic">("list");
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -334,8 +337,6 @@ export default function RecordsPage() {
         const chronoRecords = [...filteredRecords].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         chronoRecords.forEach(r => {
-            // Format date based on view mode? For now just Day.
-            // Maybe shorten it?
             const d = new Date(r.date);
             const key = `${d.getDate()}/${d.getMonth() + 1}`; // D/M
             grouped[key] = (grouped[key] || 0) + (r.rate || 0);
@@ -345,6 +346,48 @@ export default function RecordsPage() {
             date,
             amount
         }));
+    }, [filteredRecords]);
+
+    const pieDataGrade = useMemo(() => {
+        const grouped: Record<string, number> = {};
+        filteredRecords.forEach(r => {
+            const key = `Lớp ${r.grade}`;
+            grouped[key] = (grouped[key] || 0) + 1;
+        });
+        return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+    }, [filteredRecords]);
+
+    const pieDataLevel = useMemo(() => {
+        const grouped: Record<string, number> = {};
+        filteredRecords.forEach(r => {
+            const key = r.level || "Unknown";
+            grouped[key] = (grouped[key] || 0) + 1;
+        });
+        return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+    }, [filteredRecords]);
+
+    const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#06b6d4', '#e11d48'];
+
+    const heatmapData = useMemo(() => {
+        // Last 30 days
+        const days = [];
+        const today = new Date();
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(today.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+
+            // Count lessons for this date
+            const count = filteredRecords.filter(r => r.date === dateStr).length;
+
+            days.push({
+                date: dateStr,
+                count,
+                day: d.getDate(),
+                fullDate: d
+            });
+        }
+        return days;
     }, [filteredRecords]);
 
     return (
@@ -378,6 +421,30 @@ export default function RecordsPage() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
                         <span className="md:inline text-sm font-medium">Lọc</span>
                     </button>
+
+                    {/* View Toggle */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`p-2 rounded-md transition-all ${viewMode === "list"
+                                ? "bg-white dark:bg-slate-700 shadow-sm text-[var(--primary-color)]"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                }`}
+                            title="Danh sách"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        </button>
+                        <button
+                            onClick={() => setViewMode("analytic")}
+                            className={`p-2 rounded-md transition-all ${viewMode === "analytic"
+                                ? "bg-white dark:bg-slate-700 shadow-sm text-[var(--primary-color)]"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                }`}
+                            title="Thống kê"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        </button>
+                    </div>
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">
@@ -504,267 +571,369 @@ export default function RecordsPage() {
             </AnimatePresence>
 
             {/* Table */}
-            <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
-                            <tr>
-                                <th className="px-4 py-3 w-10">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
-                                        onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
-                                    />
-                                </th>
-                                <th onClick={() => handleSort("class_id")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Mã lớp</th>
-                                <th onClick={() => handleSort("grade")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Lớp</th>
-                                <th onClick={() => handleSort("level")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Trình độ</th>
-                                <th onClick={() => handleSort("rate")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap text-right">Thu nhập</th>
-                                <th onClick={() => handleSort("status")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Trạng thái</th>
-                                <th onClick={() => handleSort("class_type")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Loại</th>
-                                <th onClick={() => handleSort("feedback_status")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Feedback</th>
-                                <th onClick={() => handleSort("date")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Ngày</th>
-                                <th onClick={() => handleSort("time_start")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Giờ</th>
-                                {/* <th className="px-4 py-3 whitespace-nowrap text-right">Lương áp dụng</th>  REMOVED as per request */}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {loading ? (
-                                <tr><td colSpan={10} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
-                            ) : sortedRecords.length === 0 ? (
-                                <tr><td colSpan={10} className="p-8 text-center text-gray-500">Chưa có dữ liệu buổi học.</td></tr>
-                            ) : (
-                                sortedRecords.map((record) => (
-                                    <tr key={record.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${selectedIds.has(record.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
-                                        <td className="px-4 py-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(record.id)}
-                                                onChange={() => toggleSelectRow(record.id)}
-                                                className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3 font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => router.push(`/lesson?classId=${record.class_id}`)}
-                                                    className="p-1.5 text-gray-500 hover:text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-all"
-                                                    title="Chỉnh sửa feedback"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
-                                                </button>
-                                                {record.class_id}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">{record.grade}</td>
-                                        <td className="px-4 py-3">{record.level}</td>
-                                        <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]">
-                                            {formatCurrency(record.rate)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="relative">
-                                                <select
-                                                    value={record.status}
-                                                    onChange={(e) => updateRecord(record.id, { status: e.target.value })}
-                                                    className={`appearance-none font-bold text-xs px-3 py-1 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-all text-center border-0 ${record.status === "Hoàn thành" ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20" :
-                                                        record.status === "Hủy" ? "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:hover:bg-orange-500/20" :
-                                                            record.status === "HS vắng mặt" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:hover:bg-yellow-500/20" :
-                                                                record.status === "GS vắng mặt" ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20" :
-                                                                    record.status === "Feedback trễ" ? "bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:hover:bg-pink-500/20" :
-                                                                        "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700"
+            {viewMode === "list" && (
+                <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
+                                <tr>
+                                    <th className="px-4 py-3 w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.size === filteredRecords.length && filteredRecords.length > 0}
+                                            onChange={toggleSelectAll}
+                                            className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
+                                        />
+                                    </th>
+                                    <th onClick={() => handleSort("class_id")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Mã lớp</th>
+                                    <th onClick={() => handleSort("grade")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Lớp</th>
+                                    <th onClick={() => handleSort("level")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Trình độ</th>
+                                    <th onClick={() => handleSort("rate")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap text-right">Thu nhập</th>
+                                    <th onClick={() => handleSort("status")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Trạng thái</th>
+                                    <th onClick={() => handleSort("class_type")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Loại</th>
+                                    <th onClick={() => handleSort("feedback_status")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Feedback</th>
+                                    <th onClick={() => handleSort("date")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Ngày</th>
+                                    <th onClick={() => handleSort("time_start")} className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] whitespace-nowrap">Giờ</th>
+                                    {/* <th className="px-4 py-3 whitespace-nowrap text-right">Lương áp dụng</th>  REMOVED as per request */}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                {loading ? (
+                                    <tr><td colSpan={10} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
+                                ) : sortedRecords.length === 0 ? (
+                                    <tr><td colSpan={10} className="p-8 text-center text-gray-500">Chưa có dữ liệu buổi học.</td></tr>
+                                ) : (
+                                    sortedRecords.map((record) => (
+                                        <tr key={record.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${selectedIds.has(record.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(record.id)}
+                                                    onChange={() => toggleSelectRow(record.id)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => router.push(`/lesson?classId=${record.class_id}`)}
+                                                        className="p-1.5 text-gray-500 hover:text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-all"
+                                                        title="Chỉnh sửa feedback"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                                                    </button>
+                                                    {record.class_id}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">{record.grade}</td>
+                                            <td className="px-4 py-3">{record.level}</td>
+                                            <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]">
+                                                {formatCurrency(record.rate)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="relative">
+                                                    <select
+                                                        value={record.status}
+                                                        onChange={(e) => updateRecord(record.id, { status: e.target.value })}
+                                                        className={`appearance-none font-bold text-xs px-3 py-1 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-all text-center border-0 ${record.status === "Hoàn thành" ? "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/10 dark:text-green-400 dark:hover:bg-green-500/20" :
+                                                            record.status === "Hủy" ? "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:hover:bg-orange-500/20" :
+                                                                record.status === "HS vắng mặt" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:hover:bg-yellow-500/20" :
+                                                                    record.status === "GS vắng mặt" ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20" :
+                                                                        record.status === "Feedback trễ" ? "bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:hover:bg-pink-500/20" :
+                                                                            "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700"
+                                                            }`}
+                                                    >
+                                                        {STATUS_OPTIONS.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span
+                                                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all inline-block ${record.class_type === "BU"
+                                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
+                                                        : "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
                                                         }`}
                                                 >
-                                                    {STATUS_OPTIONS.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span
-                                                className={`px-3 py-1 rounded-full text-xs font-bold transition-all inline-block ${record.class_type === "BU"
-                                                    ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"
-                                                    : "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400"
-                                                    }`}
-                                            >
-                                                {record.class_type}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="relative">
+                                                    {record.class_type}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="relative">
+                                                    <select
+                                                        value={record.feedback_status}
+                                                        onChange={(e) => updateRecord(record.id, { feedback_status: e.target.value as any })}
+                                                        className={`appearance-none font-bold text-xs px-3 py-1 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-all text-center border-0 ${record.feedback_status === "Đã nhận xét"
+                                                            ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
+                                                            : "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20"
+                                                            }`}
+                                                    >
+                                                        {FEEDBACK_STATUS_OPTIONS.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="date"
+                                                    value={record.date}
+                                                    onChange={(e) => updateRecord(record.id, { date: e.target.value })}
+                                                    className="bg-transparent border-none text-gray-500 text-sm focus:ring-0 cursor-pointer w-[110px]"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
                                                 <select
-                                                    value={record.feedback_status}
-                                                    onChange={(e) => updateRecord(record.id, { feedback_status: e.target.value as any })}
-                                                    className={`appearance-none font-bold text-xs px-3 py-1 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 dark:focus:ring-offset-gray-900 transition-all text-center border-0 ${record.feedback_status === "Đã nhận xét"
-                                                        ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20"
-                                                        : "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20"
-                                                        }`}
+                                                    value={record.time_start || ""}
+                                                    onChange={(e) => updateRecord(record.id, { time_start: e.target.value })}
+                                                    className="bg-transparent border-none text-gray-500 text-sm focus:ring-0 cursor-pointer"
                                                 >
-                                                    {FEEDBACK_STATUS_OPTIONS.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    <option value="">--</option>
+                                                    {TIME_OPTIONS.map(t => (
+                                                        <option key={t} value={t}>{t}</option>
                                                     ))}
                                                 </select>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <input
-                                                type="date"
-                                                value={record.date}
-                                                onChange={(e) => updateRecord(record.id, { date: e.target.value })}
-                                                className="bg-transparent border-none text-gray-500 text-sm focus:ring-0 cursor-pointer w-[110px]"
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <select
-                                                value={record.time_start || ""}
-                                                onChange={(e) => updateRecord(record.id, { time_start: e.target.value })}
-                                                className="bg-transparent border-none text-gray-500 text-sm focus:ring-0 cursor-pointer"
-                                            >
-                                                <option value="">--</option>
-                                                {TIME_OPTIONS.map(t => (
-                                                    <option key={t} value={t}>{t}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        {/* REMOVED Pay Rate Column */}
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div >
+                                            </td>
+                                            {/* REMOVED Pay Rate Column */}
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div >
+            )}
 
             {/* Analytics Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                {/* Total Summary Card */}
-                <div className="md:col-span-1 glass-panel p-4 md:p-6 flex flex-col justify-center items-center shadow-lg border border-indigo-100 dark:border-indigo-900/50 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <svg className="w-24 h-24 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2 relative z-10">Tổng thu nhập (đang hiển thị)</h3>
-                    <p className="text-4xl font-black text-[var(--primary-color)] relative z-10 tracking-tight">
-                        {formatCurrency(totalIncome)}
-                    </p>
-                </div>
+            {viewMode === "analytic" && (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                        {/* Total Summary Card */}
+                        <div className="md:col-span-1 glass-panel p-4 md:p-6 flex flex-col justify-center items-center shadow-lg relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg className="w-24 h-24 text-[var(--primary-color)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <h3 className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2 relative z-10">Tổng thu nhập (đang hiển thị)</h3>
+                            <p className="text-4xl font-black text-[var(--primary-color)] relative z-10 tracking-tight">
+                                {formatCurrency(totalIncome)}
+                            </p>
+                        </div>
 
-                {/* Chart */}
-                <div className="md:col-span-2 glass-panel p-4 md:p-6 shadow-lg border border-gray-100 dark:border-gray-800">
-                    <h3 className="text-lg font-bold mb-4 text-gray-700 dark:text-gray-200">Biểu đồ thu nhập theo thời gian</h3>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                                <XAxis
-                                    dataKey="date"
-                                    tick={{ fontSize: 12, fill: '#888' }}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    tick={{ fontSize: 12, fill: '#888' }}
-                                    tickFormatter={(val) => `${val / 1000}k`}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <Tooltip
-                                    cursor={{ fill: 'transparent' }}
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                                    formatter={(value: any) => [formatCurrency(value), 'Thu nhập']}
-                                />
-                                <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill="var(--primary-color)" fillOpacity={0.8} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {/* Heatmap Card */}
+                        <div className="md:col-span-2 glass-panel p-4 md:p-6 shadow-lg">
+                            <h3 className="text-lg font-bold mb-4 text-gray-700 dark:text-gray-200">Tần suất dạy (30 ngày gần đây)</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {heatmapData.map((day, idx) => (
+                                    <div
+                                        key={day.date}
+                                        className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-medium transition-all relative group cursor-default
+                                        ${day.count === 0 ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600' :
+                                                day.count === 1 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' :
+                                                    day.count === 2 ? 'bg-indigo-300 text-indigo-900 dark:bg-indigo-500/60 dark:text-indigo-100' :
+                                                        'bg-[var(--primary-color)] text-white'
+                                            }`}
+                                        title={`${day.date}: ${day.count} buổi`}
+                                    >
+                                        {day.day}
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-4 flex gap-4 text-xs text-gray-500 justify-end">
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 rounded-sm"></div> 0 buổi</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 rounded-sm"></div> 1 buổi</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-300 rounded-sm"></div> 2 buổi</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-[var(--primary-color)] rounded-sm"></div> 3+ buổi</div>
+                            </div>
+                        </div>
+
+                        {/* Chart */}
+                        <div className="md:col-span-3 glass-panel p-4 md:p-6 shadow-lg">
+                            <h3 className="text-lg font-bold mb-4 text-gray-700 dark:text-gray-200">Biểu đồ thu nhập theo thời gian</h3>
+                            <div className="h-[250px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.8} />
+                                                <stop offset="95%" stopColor="var(--primary-color)" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                                        <XAxis
+                                            dataKey="date"
+                                            tick={{ fontSize: 12, fill: '#888' }}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 12, fill: '#888' }}
+                                            tickFormatter={(val) => `${val / 1000}k`}
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <Tooltip
+                                            cursor={{ stroke: 'var(--primary-color)', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                            formatter={(value: any) => [formatCurrency(value), 'Thu nhập']}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="amount"
+                                            stroke="var(--primary-color)"
+                                            strokeWidth={3}
+                                            fillOpacity={1}
+                                            fill="url(#colorIncome)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+
+                    {/* Pie Charts Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        {/* Grade Pie */}
+                        <div className="glass-panel p-4 md:p-6 shadow-lg">
+                            <h3 className="text-lg font-bold mb-4 text-center text-gray-700 dark:text-gray-200">Phân bố theo Lớp</h3>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={pieDataGrade}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="value"
+                                        >
+                                            {pieDataGrade.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value: any) => [value, 'Số buổi']} />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Level Pie */}
+                        <div className="glass-panel p-4 md:p-6 shadow-lg">
+                            <h3 className="text-lg font-bold mb-4 text-center text-gray-700 dark:text-gray-200">Phân bố theo Trình độ</h3>
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={pieDataLevel}
+                                            cx="50%"
+                                            cy="50%"
+                                            labelLine={false}
+                                            label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                            outerRadius={80}
+                                            fill="#8884d8"
+                                            dataKey="value"
+                                        >
+                                            {pieDataLevel.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value: any) => [value, 'Số buổi']} />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Add Record Modal */}
-            {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl w-full max-w-md p-6 shadow-2xl transform transition-all scale-100 border border-gray-100 dark:border-gray-700">
-                        <h2 className="text-xl font-bold mb-4 text-[var(--accent-color)]">Thêm buổi học mới</h2>
+            {
+                isAddModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl w-full max-w-md p-6 shadow-2xl transform transition-all scale-100 border border-gray-100 dark:border-gray-700">
+                            <h2 className="text-xl font-bold mb-4 text-[var(--accent-color)]">Thêm buổi học mới</h2>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mã lớp</label>
-                                <input
-                                    type="text"
-                                    value={newRecordData.class_id}
-                                    onChange={(e) => setNewRecordData({ ...newRecordData, class_id: e.target.value })}
-                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    placeholder="Ví dụ: C2.34"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
-                                    <select
-                                        value={newRecordData.status}
-                                        onChange={(e) => setNewRecordData({ ...newRecordData, status: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    >
-                                        {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Feedback</label>
-                                    <select
-                                        value={newRecordData.feedback_status}
-                                        onChange={(e) => setNewRecordData({ ...newRecordData, feedback_status: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    >
-                                        {FEEDBACK_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ngày giảng dạy</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mã lớp</label>
                                     <input
-                                        type="date"
-                                        value={newRecordData.date}
-                                        onChange={(e) => setNewRecordData({ ...newRecordData, date: e.target.value })}
+                                        type="text"
+                                        value={newRecordData.class_id}
+                                        onChange={(e) => setNewRecordData({ ...newRecordData, class_id: e.target.value })}
                                         className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        placeholder="Ví dụ: C2.34"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Giờ bắt đầu</label>
-                                    <select
-                                        value={newRecordData.time_start}
-                                        onChange={(e) => setNewRecordData({ ...newRecordData, time_start: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    >
-                                        {TIME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
+                                        <select
+                                            value={newRecordData.status}
+                                            onChange={(e) => setNewRecordData({ ...newRecordData, status: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        >
+                                            {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Feedback</label>
+                                        <select
+                                            value={newRecordData.feedback_status}
+                                            onChange={(e) => setNewRecordData({ ...newRecordData, feedback_status: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        >
+                                            {FEEDBACK_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ngày giảng dạy</label>
+                                        <input
+                                            type="date"
+                                            value={newRecordData.date}
+                                            onChange={(e) => setNewRecordData({ ...newRecordData, date: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Giờ bắt đầu</label>
+                                        <select
+                                            value={newRecordData.time_start}
+                                            onChange={(e) => setNewRecordData({ ...newRecordData, time_start: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        >
+                                            {TIME_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="flex justify-end gap-3 mt-8">
-                            <button
-                                onClick={() => setIsAddModalOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
-                            >
-                                Hủy bỏ
-                            </button>
-                            <button
-                                onClick={handleSaveNewRecord}
-                                className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary-color)] hover:bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30 transition-all"
-                            >
-                                Lưu buổi học
-                            </button>
+                            <div className="flex justify-end gap-3 mt-8">
+                                <button
+                                    onClick={() => setIsAddModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button
+                                    onClick={handleSaveNewRecord}
+                                    className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary-color)] hover:bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30 transition-all"
+                                >
+                                    Lưu buổi học
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div >
     );
 }

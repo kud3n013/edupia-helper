@@ -261,8 +261,8 @@ export default function LessonPage() {
 
                 // 2. Check for Class Template (Priority 2 - if no record active data loaded yet)
                 // Pattern: [fixed_class_id]-[number] eg "C2.34-1" -> "C2.34"
-                // Regex to capture everything before the last hyphen followed by digits
-                const match = classId.match(/^(.*)-(\d+)$/);
+                // Pattern: [fixed_class_id]-[suffix] eg "C2.34-1" or "C2.34-XX" -> "C2.34"
+                const match = classId.match(/^(.*)-(.+)$/);
                 if (match) {
                     const fixedClassId = match[1];
                     const { data: classData } = await supabase

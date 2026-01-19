@@ -2,23 +2,14 @@
 
 import { useState, useEffect, useMemo, Fragment } from "react";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
+import { AgendaView, ClassRecord } from "@/components/AgendaView";
 import { parseClassInfo } from "@/utils/class-utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 // --- Types ---
-interface ClassRecord {
-    id: string;
-    user_id: string;
-    fixed_class_id: string; // The "Class ID" visible to user
-    grade: number;
-    level: string;
-    state: "Đang dạy" | "Kết thúc";
-    num_students: number;
-    students: string[]; // List of student names
-    schedule: string[]; // Weekdays e.g. ["T2", "T5"]
-    time: string; // e.g. "19h30"
-    finished_lesson: number;
-}
+// Interface now imported
+
 
 const SCHEDULE_OPTIONS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const TIME_OPTIONS = [
@@ -35,7 +26,8 @@ export default function ClassesPage() {
     const [filters, setFilters] = useState({
         grade: "all",
         level: "all",
-        state: "Đang dạy" as "Đang dạy" | "Kết thúc" | "all"
+        state: "Đang dạy" as "Đang dạy" | "Kết thúc" | "all",
+        schedule: [] as string[]
     });
 
     // Modal State
@@ -52,6 +44,12 @@ export default function ClassesPage() {
 
     // Expanded Rows for Student Editing
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+    // Sorting State
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" }>({ key: "schedule", direction: "asc" });
+
+    // View Mode
+    const [viewMode, setViewMode] = useState<"list" | "agenda">("list");
 
     useEffect(() => {
         fetchClasses();
@@ -103,23 +101,80 @@ export default function ClassesPage() {
     }, [classes]);
 
     // --- Search & Filter ---
-    const filteredClasses = classes.filter((c) => {
-        if (filters.state !== "all" && c.state !== filters.state) return false;
-        if (filters.grade !== "all" && c.grade?.toString() !== filters.grade) return false;
-        if (filters.level !== "all" && c.level !== filters.level) return false;
+    // --- Search & Filter & Sort ---
+    const sortedClasses = useMemo(() => {
+        let items = classes.filter((c) => {
+            if (filters.state !== "all" && c.state !== filters.state) return false;
+            if (filters.grade !== "all" && c.grade?.toString() !== filters.grade) return false;
+            if (filters.level !== "all" && c.level !== filters.level) return false;
+            if (filters.schedule.length > 0) {
+                // If class has no schedule, it doesn't match if we are filtering by schedule
+                if (!c.schedule || c.schedule.length === 0) return false;
+                // Check if any of the class days match the filtered days
+                const hasMatch = c.schedule.some(day => filters.schedule.includes(day));
+                if (!hasMatch) return false;
+            }
 
-        const searchStr = query.toLowerCase();
-        return (
-            (c.fixed_class_id || "").toLowerCase().includes(searchStr) ||
-            (c.grade?.toString() || "").includes(searchStr) ||
-            (c.level || "").toLowerCase().includes(searchStr)
-        );
-    });
+            const searchStr = query.toLowerCase();
+            return (
+                (c.fixed_class_id || "").toLowerCase().includes(searchStr) ||
+                (c.grade?.toString() || "").includes(searchStr) ||
+                (c.level || "").toLowerCase().includes(searchStr)
+            );
+        });
+
+        if (sortConfig !== null) {
+            items.sort((a, b) => {
+                if (sortConfig.key === "schedule") {
+                    const dayWeights: Record<string, number> = { "CN": 0, "T2": 1, "T3": 2, "T4": 3, "T5": 4, "T6": 5, "T7": 6 };
+
+                    const getMinWeight = (schedule: string[]) => {
+                        if (!schedule || schedule.length === 0) return 999;
+                        return Math.min(...schedule.map(d => dayWeights[d] ?? 999));
+                    };
+
+                    const aWeight = getMinWeight(a.schedule);
+                    const bWeight = getMinWeight(b.schedule);
+
+                    if (aWeight < bWeight) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (aWeight > bWeight) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                }
+
+                let aValue: any = sortConfig.key === "students" ? a.students.length : a[sortConfig.key as keyof ClassRecord];
+                let bValue: any = sortConfig.key === "students" ? b.students.length : b[sortConfig.key as keyof ClassRecord];
+
+                if (typeof aValue === 'string') {
+                    aValue = aValue.toLowerCase();
+                    bValue = bValue.toLowerCase();
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return items;
+    }, [classes, filters, query, sortConfig]);
+
+    const handleSort = (key: string) => {
+        setSortConfig(current => {
+            if (current?.key === key) {
+                return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+            }
+            return { key, direction: "asc" };
+        });
+    };
 
     // --- Actions ---
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} lớp đã chọn?`)) return;
+        if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} lớp đã chọn ? `)) return;
 
         const supabase = createClient();
         const { error } = await supabase
@@ -137,10 +192,10 @@ export default function ClassesPage() {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === filteredClasses.length && filteredClasses.length > 0) {
+        if (selectedIds.size === sortedClasses.length && sortedClasses.length > 0) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(filteredClasses.map(c => c.id)));
+            setSelectedIds(new Set(sortedClasses.map(c => c.id)));
         }
     };
 
@@ -192,7 +247,7 @@ export default function ClassesPage() {
         } else if (data) {
             // Auto-update records to 'CN' if they match the pattern
             // Pattern: [fixed_class_id]-[number]
-            const pattern = `${newClassData.fixed_class_id}-%`;
+            const pattern = `${newClassData.fixed_class_id} -% `;
             const { error: updateError } = await supabase
                 .from("records")
                 .update({ class_type: "CN" })
@@ -218,6 +273,14 @@ export default function ClassesPage() {
 
     const toggleScheduleDay = (day: string) => {
         setNewClassData(prev => {
+            const exists = prev.schedule.includes(day);
+            if (exists) return { ...prev, schedule: prev.schedule.filter(d => d !== day) };
+            return { ...prev, schedule: [...prev.schedule, day] };
+        });
+    };
+
+    const toggleFilterSchedule = (day: string) => {
+        setFilters(prev => {
             const exists = prev.schedule.includes(day);
             if (exists) return { ...prev, schedule: prev.schedule.filter(d => d !== day) };
             return { ...prev, schedule: [...prev.schedule, day] };
@@ -310,7 +373,7 @@ export default function ClassesPage() {
                     <div className="w-full">
                         <div className="flex flex-wrap gap-2 mb-3">
                             {classRec.students.map((s, idx) => (
-                                <div key={`${idx}-${s}`} className="w-auto">
+                                <div key={`${idx} -${s} `} className="w-auto">
                                     <StudentItem
                                         initialName={s}
                                         onSave={(val) => updateStudentName(idx, val)}
@@ -337,6 +400,9 @@ export default function ClassesPage() {
             </motion.div>
         );
     };
+
+    // --- Sub-component: AgendaView ---
+    // AgendaView removed (imported)
 
     return (
         <div className="w-full px-4 md:px-8 py-6 animate-fade-in pb-20">
@@ -369,6 +435,30 @@ export default function ClassesPage() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
                         <span className="md:inline text-sm font-medium">Lọc</span>
                     </button>
+
+                    {/* View Toggle */}
+                    <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <button
+                            onClick={() => setViewMode("list")}
+                            className={`p-2 rounded-md transition-all ${viewMode === "list"
+                                ? "bg-white dark:bg-slate-700 shadow-sm text-[var(--primary-color)]"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                }`}
+                            title="Danh sách"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        </button>
+                        <button
+                            onClick={() => setViewMode("agenda")}
+                            className={`p-2 rounded-md transition-all ${viewMode === "agenda"
+                                ? "bg-white dark:bg-slate-700 shadow-sm text-[var(--primary-color)]"
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                }`}
+                            title="Lịch biểu"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        </button>
+                    </div>
 
                     <div className="flex gap-2">
                         <button
@@ -449,13 +539,33 @@ export default function ClassesPage() {
                                 </select>
                             </div>
 
+                            {/* Schedule Filter */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-4 mt-2">
+                                <label className="block text-xs font-semibold text-gray-500 mb-2">Lịch học</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {SCHEDULE_OPTIONS.map(day => (
+                                        <button
+                                            key={day}
+                                            onClick={() => toggleFilterSchedule(day)}
+                                            className={`w-8 h-8 rounded-full text-xs font-bold transition-all border ${filters.schedule.includes(day)
+                                                ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
+                                                : "bg-transparent text-gray-500 border-gray-200 dark:border-gray-700 hover:border-[var(--primary-color)]"
+                                                }`}
+                                        >
+                                            {day}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Reset Button */}
                             <div className="flex items-end">
                                 <button
                                     onClick={() => setFilters({
                                         grade: "all",
                                         level: "all",
-                                        state: "all"
+                                        state: "all",
+                                        schedule: []
                                     })}
                                     className="w-full p-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                 >
@@ -467,173 +577,276 @@ export default function ClassesPage() {
                 )}
             </AnimatePresence>
 
-            {/* Table */}
-            <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
-                            <tr>
-                                <th className="px-4 py-3 w-10">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.size === filteredClasses.length && filteredClasses.length > 0}
-                                        onChange={toggleSelectAll}
-                                        className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
-                                    />
-                                </th>
-                                <th className="px-4 py-3">Mã lớp</th>
-                                <th className="px-4 py-3">Lớp</th>
-                                <th className="px-4 py-3">Trình độ</th>
-                                <th className="px-4 py-3 text-center">Đã hoàn thành</th>
-                                <th className="px-4 py-3">Lịch học</th>
-                                <th className="px-4 py-3">Thời gian</th>
-                                <th className="px-4 py-3 text-center">Học sinh</th>
-                                <th className="px-4 py-3 w-[50px]"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                            {loading ? (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
-                            ) : filteredClasses.length === 0 ? (
-                                <tr><td colSpan={8} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
-                            ) : (
-                                filteredClasses.map((cls) => (
-                                    <Fragment key={cls.id}>
-                                        <tr key={cls.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${selectedIds.has(cls.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
-                                            <td className="px-4 py-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(cls.id)}
-                                                    onChange={() => toggleSelectRow(cls.id)}
-                                                    className="rounded border-gray-300 text-[var(--primary-color)] focus:ring-[var(--primary-color)]"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3 font-medium">{cls.fixed_class_id}</td>
-                                            <td className="px-4 py-3">{cls.grade}</td>
-                                            <td className="px-4 py-3">{cls.level}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="inline-block px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-bold text-xs border border-green-200 dark:border-green-800">
-                                                    {cls.finished_lesson} buổi
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex gap-1 flex-wrap">
-                                                    {cls.schedule && cls.schedule.map(d => (
-                                                        <span key={d} className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">{d}</span>
-                                                    ))}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="font-mono text-gray-600 dark:text-gray-400">{cls.time}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="inline-block min-w-[30px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 font-bold text-xs">{cls.students?.length || 0}</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <button
-                                                    onClick={() => setExpandedRowId(expandedRowId === cls.id ? null : cls.id)}
-                                                    className={`p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-transform ${expandedRowId === cls.id ? 'rotate-180' : ''}`}
+            {
+                viewMode === "list" ? (
+                    /* Table View */
+                    <div className="glass-panel overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
+                                    <tr>
+                                        <th className="px-4 py-3 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.size === sortedClasses.length && sortedClasses.length > 0}
+                                                onChange={toggleSelectAll}
+                                                className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
+                                            />
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('fixed_class_id')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Mã lớp
+                                                {sortConfig?.key === 'fixed_class_id' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('grade')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Lớp
+                                                {sortConfig?.key === 'grade' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('level')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Trình độ
+                                                {sortConfig?.key === 'level' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 text-center cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('finished_lesson')}
+                                        >
+                                            <div className="flex items-center justify-center gap-1">
+                                                Đã hoàn thành
+                                                {sortConfig?.key === 'finished_lesson' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('schedule')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Lịch học
+                                                {sortConfig?.key === 'schedule' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('time')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Thời gian
+                                                {sortConfig?.key === 'time' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 text-center cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            onClick={() => handleSort('students')}
+                                        >
+                                            <div className="flex items-center justify-center gap-1">
+                                                Học sinh
+                                                {sortConfig?.key === 'students' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th className="px-4 py-3 w-[50px]"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                    {loading ? (
+                                        <tr><td colSpan={9} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
+                                    ) : sortedClasses.length === 0 ? (
+                                        <tr><td colSpan={9} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
+                                    ) : (
+                                        sortedClasses.map((cls) => (
+                                            <Fragment key={cls.id}>
+                                                <tr
+                                                    key={cls.id}
+                                                    onClick={() => toggleSelectRow(cls.id)}
+                                                    className={`hover: bg - gray - 50 dark: hover: bg - gray - 800 / 50 transition - colors cursor - pointer ${selectedIds.has(cls.id) ? "bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20" : ""} `}
                                                 >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        {/* Expandable Row */}
-                                        <AnimatePresence>
-                                            {expandedRowId === cls.id && (
-                                                <tr>
-                                                    <td colSpan={8} className="p-0 border-none">
-                                                        <EditStudentsRow classRec={cls} />
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.has(cls.id)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            onChange={() => toggleSelectRow(cls.id)}
+                                                            className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3 font-medium">{cls.fixed_class_id}</td>
+                                                    <td className="px-4 py-3">{cls.grade}</td>
+                                                    <td className="px-4 py-3">{cls.level}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-bold text-xs border border-green-200 dark:border-green-800">
+                                                            {cls.finished_lesson} buổi
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex gap-1 flex-wrap">
+                                                            {cls.schedule && cls.schedule.map(d => (
+                                                                <span key={d} className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">{d}</span>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="font-mono text-gray-600 dark:text-gray-400">{cls.time}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className="inline-block min-w-[30px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 font-bold text-xs">{cls.students?.length || 0}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <button
+                                                            onClick={() => setExpandedRowId(expandedRowId === cls.id ? null : cls.id)}
+                                                            className={`p - 2 rounded - full hover: bg - black / 5 dark: hover: bg - white / 10 transition - transform ${expandedRowId === cls.id ? 'rotate-180' : ''} `}
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                                        </button>
                                                     </td>
                                                 </tr>
-                                            )}
-                                        </AnimatePresence>
-                                    </Fragment>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Add Class Modal */}
-            {isAddModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl w-full max-w-md p-6 shadow-2xl border border-gray-100 dark:border-gray-700">
-                        <h2 className="text-xl font-bold mb-4 text-[var(--accent-color)]">Thêm lớp chủ nhiệm mới</h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mã lớp</label>
-                                <input
-                                    type="text"
-                                    value={newClassData.fixed_class_id}
-                                    onChange={(e) => setNewClassData({ ...newClassData, fixed_class_id: e.target.value })}
-                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    placeholder="Ví dụ: C2.34"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lịch học</label>
-                                <div className="flex flex-wrap gap-2">
-                                    {SCHEDULE_OPTIONS.map(day => (
-                                        <button
-                                            key={day}
-                                            onClick={() => toggleScheduleDay(day)}
-                                            className={`w-9 h-9 rounded-full text-xs font-bold transition-all border ${newClassData.schedule.includes(day)
-                                                ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
-                                                : "bg-transparent text-gray-500 border-gray-200 dark:border-gray-700 hover:border-[var(--primary-color)]"
-                                                }`}
-                                        >
-                                            {day}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thời gian</label>
-                                    <select
-                                        value={newClassData.time}
-                                        onChange={(e) => setNewClassData({ ...newClassData, time: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    >
-                                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
-                                    <select
-                                        value={newClassData.state}
-                                        onChange={(e) => setNewClassData({ ...newClassData, state: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
-                                    >
-                                        <option value="Đang dạy">Đang dạy</option>
-                                        <option value="Kết thúc">Kết thúc</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-8">
-                            <button
-                                onClick={() => setIsAddModalOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
-                            >
-                                Hủy bỏ
-                            </button>
-                            <button
-                                onClick={handleSaveNewClass}
-                                className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary-color)] hover:bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30 transition-all"
-                            >
-                                Lưu lớp
-                            </button>
+                                                {/* Expandable Row */}
+                                                <AnimatePresence>
+                                                    {expandedRowId === cls.id && (
+                                                        <tr>
+                                                            <td colSpan={9} className="p-0 border-none">
+                                                                <EditStudentsRow classRec={cls} />
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </AnimatePresence>
+                                            </Fragment>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                ) : (
+                    /* Agenda View is now in a shared component */
+                    <AgendaView
+                        classes={sortedClasses}
+                        selectedIds={selectedIds}
+                        onToggleSelect={toggleSelectRow}
+                    />
+                )
+            }
+
+
+            {/* Add Class Modal */}
+            {
+                isAddModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white dark:bg-[#1e1e2d] rounded-2xl w-full max-w-md p-6 shadow-2xl border border-gray-100 dark:border-gray-700">
+                            <h2 className="text-xl font-bold mb-4 text-[var(--accent-color)]">Thêm lớp chủ nhiệm mới</h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mã lớp</label>
+                                    <input
+                                        type="text"
+                                        value={newClassData.fixed_class_id}
+                                        onChange={(e) => setNewClassData({ ...newClassData, fixed_class_id: e.target.value })}
+                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        placeholder="Ví dụ: C2.34"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lịch học</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {SCHEDULE_OPTIONS.map(day => (
+                                            <button
+                                                key={day}
+                                                onClick={() => toggleScheduleDay(day)}
+                                                className={`w-9 h-9 rounded-full text-xs font-bold transition-all border ${newClassData.schedule.includes(day)
+                                                    ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
+                                                    : "bg-transparent text-gray-500 border-gray-200 dark:border-gray-700 hover:border-[var(--primary-color)]"
+                                                    }`}
+                                            >
+                                                {day}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Thời gian</label>
+                                        <select
+                                            value={newClassData.time}
+                                            onChange={(e) => setNewClassData({ ...newClassData, time: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        >
+                                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
+                                        <select
+                                            value={newClassData.state}
+                                            onChange={(e) => setNewClassData({ ...newClassData, state: e.target.value })}
+                                            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        >
+                                            <option value="Đang dạy">Đang dạy</option>
+                                            <option value="Kết thúc">Kết thúc</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-8">
+                                <button
+                                    onClick={() => setIsAddModalOpen(false)}
+                                    className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-all"
+                                >
+                                    Hủy bỏ
+                                </button>
+                                <button
+                                    onClick={handleSaveNewClass}
+                                    className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary-color)] hover:bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/30 transition-all"
+                                >
+                                    Lưu lớp
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
