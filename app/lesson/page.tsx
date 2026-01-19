@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/Slider";
 import { Reorder, AnimatePresence, motion } from "framer-motion";
 import { useLenis } from "@/components/SmoothScrolling";
 import { useSearchParams } from "next/navigation";
+import { useConfirm } from "@/contexts/ConfirmationContext";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
@@ -83,6 +84,7 @@ interface Student {
 export default function LessonPage() {
     // --- Hooks ---
     const lenis = useLenis();
+    const confirm = useConfirm();
     const searchParams = useSearchParams();
 
     // --- State: General & Lesson Info ---
@@ -316,10 +318,15 @@ export default function LessonPage() {
         return () => clearTimeout(timeoutId);
     }, [classId]);
 
-    const handleLoadOldFeedback = () => {
+    const handleLoadOldFeedback = async () => {
         if (!existingRecordData) return;
 
-        if (confirm("Dữ liệu hiện tại sẽ bị ghi đè. Bạn có chắc chắn muốn tải lại feedback cũ?")) {
+        if (await confirm({
+            title: "Tải lại dữ liệu cũ",
+            message: "Dữ liệu hiện tại sẽ bị ghi đè. Bạn có chắc chắn muốn tải lại feedback cũ?",
+            confirmText: "Tải lại",
+            type: "warning"
+        })) {
             const d = existingRecordData;
             if (d.grade) setGrade(d.grade);
             if (d.level) setLevel(d.level);
@@ -585,8 +592,13 @@ export default function LessonPage() {
         ].includes(tag);
     };
 
-    const handleReset = () => {
-        if (!confirm("Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu về mặc định?")) return;
+    const handleReset = async () => {
+        if (!await confirm({
+            title: "Đặt lại dữ liệu",
+            message: "Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu về mặc định?",
+            type: "danger",
+            confirmText: "Đặt lại"
+        })) return;
 
         // Scroll to top
         lenis?.scrollTo(0, { immediate: false });
@@ -637,7 +649,12 @@ export default function LessonPage() {
 
         // Check override early to prevent generation if cancelled
         if (existingId) {
-            if (!confirm("Cảnh báo: Dữ liệu của lớp này đã tồn tại. Bạn có chắc chắn muốn ghi đè (Override) không?")) {
+            if (!await confirm({
+                title: "Xác nhận ghi đè",
+                message: "Cảnh báo: Dữ liệu của lớp này đã tồn tại. Bạn có chắc chắn muốn ghi đè (Override) không?",
+                type: "warning",
+                confirmText: "Ghi đè"
+            })) {
                 return;
             }
         }
@@ -1000,7 +1017,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                     type="checkbox"
                                     checked={atmosphereChecked}
                                     onChange={(e) => setAtmosphereChecked(e.target.checked)}
-                                    className="w-5 h-5 rounded border-gray-300 accent-[var(--primary-color)] focus:ring-[var(--primary-color)] cursor-pointer"
+                                    className="appearance-none w-5 h-5 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
                                 />
                             </label>
                             <label className="min-w-[140px] font-medium">Không khí lớp học</label>
@@ -1022,7 +1039,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                     type="checkbox"
                                     checked={progressChecked}
                                     onChange={(e) => setProgressChecked(e.target.checked)}
-                                    className="w-5 h-5 rounded border-gray-300 accent-[var(--primary-color)] focus:ring-[var(--primary-color)] cursor-pointer"
+                                    className="appearance-none w-5 h-5 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
                                 />
                             </label>
                             <label className="min-w-[140px] font-medium">Buổi học diễn ra</label>
@@ -1117,7 +1134,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                                             const newStudents = students.map(s => s.id === student.id ? { ...s, isAbsent: e.target.checked } : s);
                                                             setStudents(newStudents);
                                                         }}
-                                                        className="w-4 h-4 rounded border-gray-300 accent-red-500 focus:ring-red-500 cursor-pointer"
+                                                        className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-red-500 checked:border-red-500 checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
                                                     />
                                                     <span className={`text-xs font-bold ${student.isAbsent ? 'text-red-500' : 'text-gray-400'}`}>Vắng</span>
                                                 </label>

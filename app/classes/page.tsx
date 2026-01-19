@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AgendaView, ClassRecord } from "@/components/AgendaView";
 import { parseClassInfo } from "@/utils/class-utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useConfirm } from "@/contexts/ConfirmationContext";
 
 // --- Types ---
 // Interface now imported
@@ -13,12 +14,167 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const SCHEDULE_OPTIONS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const TIME_OPTIONS = [
-    "18h30", "19h00", "19h30", "20h00", "20h30", "21h00"
+    "18:30", "19:00", "19:30", "20:00", "20:30", "21:00"
 ];
+
+// --- Sub-component: Student Item ---
+const StudentItem = ({ initialName, onSave, onRemove }: { initialName: string, onSave: (val: string) => void, onRemove: () => void }) => {
+    const [name, setName] = useState(initialName);
+
+    useEffect(() => {
+        setName(initialName);
+    }, [initialName]);
+
+    return (
+        <div className="flex gap-2 items-center">
+            <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => onSave(name)}
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                className="flex-1 p-2 text-sm border rounded bg-white dark:bg-slate-700 dark:border-slate-600 w-full max-w-[90px]"
+            />
+            <button onClick={onRemove} className="text-red-500 hover:text-red-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+    )
+};
+
+// --- Sub-component: Student List Editor (Reusable) ---
+const StudentListEditor = ({ students, onUpdate }: { students: string[], onUpdate: (students: string[]) => void }) => {
+    const [newStudentName, setNewStudentName] = useState("");
+    const isFull = students.length >= 6;
+
+    const addStudent = () => {
+        if (isFull) return;
+        if (newStudentName.trim()) {
+            const updated = [...students, newStudentName.trim()];
+            onUpdate(updated);
+            setNewStudentName("");
+        }
+    };
+
+    const removeStudent = (index: number) => {
+        const updated = students.filter((_, i) => i !== index);
+        onUpdate(updated);
+    };
+
+    const updateStudentName = (index: number, newName: string) => {
+        if (newName === students[index]) return;
+        const updated = [...students];
+        updated[index] = newName.trim();
+        onUpdate(updated);
+    };
+
+    return (
+        <div className="w-full">
+            <div className="flex flex-col gap-2 mb-3">
+                <AnimatePresence initial={false}>
+                    {students.map((s, idx) => (
+                        <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="w-full overflow-hidden"
+                        >
+                            <StudentItem
+                                initialName={s}
+                                onSave={(val) => updateStudentName(idx, val)}
+                                onRemove={() => removeStudent(idx)}
+                            />
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
+
+            <div className="flex gap-2 items-center">
+                <input
+                    placeholder={isFull ? "Tối đa 6" : "Thêm..."}
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addStudent()}
+                    disabled={isFull}
+                    className={`p-2 text-sm border border-dashed rounded bg-transparent dark:border-slate-600 focus:bg-white dark:focus:bg-slate-700 w-full max-w-[90px] ${isFull ? 'cursor-not-allowed opacity-50' : ''}`}
+                    autoFocus
+                />
+                <button
+                    onClick={addStudent}
+                    disabled={isFull}
+                    className={`text-[var(--primary-color)] hover:text-indigo-600 shrink-0 ${isFull ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// --- Sub-component: Finished Lessons List ---
+const FinishedLessonsList = ({ lessons }: { lessons: string[] }) => {
+    // If no lessons, we still render the container so it animates cleanly (or we render null? 
+    // If we render null here, the cell is empty.
+    // The user saw "Chưa có bài học nào hoàn thành" so we are rendering that div.
+
+    // We moved the check inside? No, let's keep the check but wrap the RESULT.
+    // Actually, if we return early, we might return a raw div which isn't animated.
+    // Better to wrap the whole thing.
+
+    const content = (!lessons || lessons.length === 0) ? (
+        <div className="text-xs text-gray-400 p-2 text-center">Chưa có bài học nào hoàn thành.</div>
+    ) : (
+        <div className="bg-gray-50 dark:bg-slate-800/50 p-2 border-t border-gray-100 dark:border-gray-700 shadow-inner h-full max-h-[200px] overflow-y-auto">
+            <ul className="space-y-1 w-full">
+                {lessons.map((lesson, idx) => (
+                    <li key={idx} className="text-xs text-gray-600 dark:text-gray-300 flex items-center justify-center gap-2">
+                        <svg className="w-3 h-3 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                        <span>{lesson}</span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+        >
+            {content}
+        </motion.div>
+    );
+};
+
+// --- Sub-component: Edit Students Row (Wrapper for Expansion) ---
+const EditStudentsRow = ({ classRec, onUpdate }: { classRec: ClassRecord, onUpdate: (students: string[]) => void }) => {
+    return (
+        <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="overflow-hidden"
+        >
+            <div className="bg-gray-50 dark:bg-slate-800/50 p-2 border-t border-gray-100 dark:border-gray-700 shadow-inner flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                    <h4 className="text-xs font-semibold text-gray-500 mb-1">Học sinh</h4>
+                    <StudentListEditor students={classRec.students} onUpdate={onUpdate} />
+                </div>
+                {/* Finished Lessons List integrated here if needed, but currently passed via table structure */}
+            </div>
+        </motion.div>
+    );
+};
 
 export default function ClassesPage() {
     const [classes, setClasses] = useState<ClassRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const confirm = useConfirm();
     const [query, setQuery] = useState("");
 
     // Filters State
@@ -30,13 +186,15 @@ export default function ClassesPage() {
         schedule: [] as string[]
     });
 
+    const [errors, setErrors] = useState<{ classId?: string, schedule?: string }>({});
+
     // Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newClassData, setNewClassData] = useState({
         fixed_class_id: "",
         state: "Đang dạy",
         schedule: [] as string[],
-        time: "19h00",
+        time: "19:00",
         students: [] as string[] // Initial empty list
     });
 
@@ -66,7 +224,7 @@ export default function ClassesPage() {
 
         const { data, error } = await supabase
             .from("classes")
-            .select("*, finished_lesson")
+            .select("*, finished_lessons")
             .eq("user_id", user.id)
             .order("fixed_class_id", { ascending: true }); // Sort by Class ID by default
 
@@ -78,8 +236,10 @@ export default function ClassesPage() {
                     ...d,
                     students: Array.isArray(d.students) ? d.students : [],
                     schedule: Array.isArray(d.schedule) ? d.schedule : [],
-                    finished_lesson: d.finished_lesson || 0
+                    num_finished_lessons: d.num_finished_lessons || 0,
+                    finished_lessons: d.finished_lessons || []
                 }));
+                // @ts-ignore - Supabase type mismatch workaround (num_finished_lessons added via SQL)
                 setClasses(parsedData);
             }
         }
@@ -174,7 +334,13 @@ export default function ClassesPage() {
     // --- Actions ---
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} lớp đã chọn ? `)) return;
+        if (!await confirm({
+            title: "Xác nhận xóa lớp",
+            message: `Bạn có chắc chắn muốn xóa ${selectedIds.size} lớp đã chọn?`,
+            type: 'danger',
+            confirmText: 'Xóa',
+            cancelText: 'Hủy'
+        })) return;
 
         const supabase = createClient();
         const { error } = await supabase
@@ -211,10 +377,15 @@ export default function ClassesPage() {
 
     // --- Actions ---
     const handleSaveNewClass = async () => {
-        if (!newClassData.fixed_class_id.trim()) {
-            alert("Vui lòng nhập Mã lớp!");
+        const newErrors: { classId?: string, schedule?: string } = {};
+        if (!newClassData.fixed_class_id.trim()) newErrors.classId = "Vui lòng nhập Mã lớp";
+        if (newClassData.schedule.length === 0) newErrors.schedule = "Vui lòng chọn lịch học";
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
 
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -265,7 +436,7 @@ export default function ClassesPage() {
                 fixed_class_id: "",
                 state: "Đang dạy",
                 schedule: [],
-                time: "19h00",
+                time: "19:00",
                 students: []
             });
         }
@@ -274,8 +445,14 @@ export default function ClassesPage() {
     const toggleScheduleDay = (day: string) => {
         setNewClassData(prev => {
             const exists = prev.schedule.includes(day);
-            if (exists) return { ...prev, schedule: prev.schedule.filter(d => d !== day) };
-            return { ...prev, schedule: [...prev.schedule, day] };
+            const newSchedule = exists ? prev.schedule.filter(d => d !== day) : [...prev.schedule, day];
+
+            // Clear error if at least one day is selected
+            if (newSchedule.length > 0 && errors.schedule) {
+                setErrors(prevErr => ({ ...prevErr, schedule: undefined }));
+            }
+
+            return { ...prev, schedule: newSchedule };
         });
     };
 
@@ -311,95 +488,10 @@ export default function ClassesPage() {
         });
     };
 
-    // --- Sub-component: Student Item ---
-    const StudentItem = ({ initialName, onSave, onRemove }: { initialName: string, onSave: (val: string) => void, onRemove: () => void }) => {
-        const [name, setName] = useState(initialName);
 
-        useEffect(() => {
-            setName(initialName);
-        }, [initialName]);
-
-        return (
-            <div className="flex gap-2 items-center">
-                <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onBlur={() => onSave(name)}
-                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                    className="flex-1 p-2 text-sm border rounded bg-white dark:bg-slate-700 dark:border-slate-600 w-full max-w-[120px]"
-                />
-                <button onClick={onRemove} className="text-red-500 hover:text-red-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            </div>
-        )
-    };
 
     // --- Sub-component: Edit Students ---
-    // --- Sub-component: Edit Students ---
-    const EditStudentsRow = ({ classRec }: { classRec: ClassRecord }) => {
-        const [newStudentName, setNewStudentName] = useState("");
 
-        const addStudent = () => {
-            if (newStudentName.trim()) {
-                const updated = [...classRec.students, newStudentName.trim()];
-                handleUpdateStudents(classRec.id, updated);
-                setNewStudentName("");
-            }
-        };
-
-        const removeStudent = (index: number) => {
-            const updated = classRec.students.filter((_, i) => i !== index);
-            handleUpdateStudents(classRec.id, updated);
-        };
-
-        const updateStudentName = (index: number, newName: string) => {
-            if (newName === classRec.students[index]) return;
-            const updated = [...classRec.students];
-            updated[index] = newName.trim();
-            handleUpdateStudents(classRec.id, updated);
-        };
-
-        return (
-            <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="overflow-hidden"
-            >
-                <div className="bg-gray-50 dark:bg-slate-800/50 p-4 border-t border-gray-100 dark:border-gray-700">
-                    <h4 className="font-bold mb-2 text-sm text-[var(--primary-color)]">Danh sách học sinh ({classRec.students.length})</h4>
-                    <div className="w-full">
-                        <div className="flex flex-wrap gap-2 mb-3">
-                            {classRec.students.map((s, idx) => (
-                                <div key={`${idx} -${s} `} className="w-auto">
-                                    <StudentItem
-                                        initialName={s}
-                                        onSave={(val) => updateStudentName(idx, val)}
-                                        onRemove={() => removeStudent(idx)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-2 items-center">
-                            <input
-                                placeholder="Thêm..."
-                                value={newStudentName}
-                                onChange={(e) => setNewStudentName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && addStudent()}
-                                className="p-2 text-sm border border-dashed rounded bg-transparent dark:border-slate-600 focus:bg-white dark:focus:bg-slate-700 w-full max-w-[120px]"
-                            />
-                            <button onClick={addStudent} className="text-[var(--primary-color)] hover:text-indigo-600">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </motion.div>
-        );
-    };
 
     // --- Sub-component: AgendaView ---
     // AgendaView removed (imported)
@@ -585,7 +677,7 @@ export default function ClassesPage() {
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-semibold text-gray-500">
                                     <tr>
-                                        <th className="px-4 py-3 w-10">
+                                        <th className="px-4 py-3 w-10 hidden md:table-cell">
                                             <input
                                                 type="checkbox"
                                                 checked={selectedIds.size === sortedClasses.length && sortedClasses.length > 0}
@@ -607,7 +699,7 @@ export default function ClassesPage() {
                                             </div>
                                         </th>
                                         <th
-                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
                                             onClick={() => handleSort('grade')}
                                         >
                                             <div className="flex items-center gap-1">
@@ -620,7 +712,7 @@ export default function ClassesPage() {
                                             </div>
                                         </th>
                                         <th
-                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
                                             onClick={() => handleSort('level')}
                                         >
                                             <div className="flex items-center gap-1">
@@ -633,12 +725,12 @@ export default function ClassesPage() {
                                             </div>
                                         </th>
                                         <th
-                                            className="px-4 py-3 text-center cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
-                                            onClick={() => handleSort('finished_lesson')}
+                                            className="px-4 py-3 text-center cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
+                                            onClick={() => handleSort('num_finished_lessons')}
                                         >
                                             <div className="flex items-center justify-center gap-1">
                                                 Đã hoàn thành
-                                                {sortConfig?.key === 'finished_lesson' && (
+                                                {sortConfig?.key === 'num_finished_lessons' && (
                                                     <span className="text-[var(--primary-color)]">
                                                         {sortConfig.direction === 'asc' ? '↑' : '↓'}
                                                     </span>
@@ -646,7 +738,7 @@ export default function ClassesPage() {
                                             </div>
                                         </th>
                                         <th
-                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
                                             onClick={() => handleSort('schedule')}
                                         >
                                             <div className="flex items-center gap-1">
@@ -659,7 +751,7 @@ export default function ClassesPage() {
                                             </div>
                                         </th>
                                         <th
-                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors"
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
                                             onClick={() => handleSort('time')}
                                         >
                                             <div className="flex items-center gap-1">
@@ -700,7 +792,7 @@ export default function ClassesPage() {
                                                     onClick={() => toggleSelectRow(cls.id)}
                                                     className={`hover: bg - gray - 50 dark: hover: bg - gray - 800 / 50 transition - colors cursor - pointer ${selectedIds.has(cls.id) ? "bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20" : ""} `}
                                                 >
-                                                    <td className="px-4 py-3">
+                                                    <td className="px-4 py-3 hidden md:table-cell">
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedIds.has(cls.id)}
@@ -710,21 +802,21 @@ export default function ClassesPage() {
                                                         />
                                                     </td>
                                                     <td className="px-4 py-3 font-medium">{cls.fixed_class_id}</td>
-                                                    <td className="px-4 py-3">{cls.grade}</td>
-                                                    <td className="px-4 py-3">{cls.level}</td>
-                                                    <td className="px-4 py-3 text-center">
+                                                    <td className="px-4 py-3 hidden md:table-cell">{cls.grade}</td>
+                                                    <td className="px-4 py-3 hidden md:table-cell">{cls.level}</td>
+                                                    <td className="px-4 py-3 text-center hidden md:table-cell">
                                                         <span className="inline-block px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400 font-bold text-xs border border-green-200 dark:border-green-800">
-                                                            {cls.finished_lesson} buổi
+                                                            {cls.num_finished_lessons} buổi
                                                         </span>
                                                     </td>
-                                                    <td className="px-4 py-3">
+                                                    <td className="px-4 py-3 hidden md:table-cell">
                                                         <div className="flex gap-1 flex-wrap">
                                                             {cls.schedule && cls.schedule.map(d => (
                                                                 <span key={d} className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">{d}</span>
                                                             ))}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-3">
+                                                    <td className="px-4 py-3 hidden md:table-cell">
                                                         <span className="font-mono text-gray-600 dark:text-gray-400">{cls.time}</span>
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
@@ -732,7 +824,10 @@ export default function ClassesPage() {
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <button
-                                                            onClick={() => setExpandedRowId(expandedRowId === cls.id ? null : cls.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setExpandedRowId(expandedRowId === cls.id ? null : cls.id);
+                                                            }}
                                                             className={`p - 2 rounded - full hover: bg - black / 5 dark: hover: bg - white / 10 transition - transform ${expandedRowId === cls.id ? 'rotate-180' : ''} `}
                                                         >
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -742,11 +837,40 @@ export default function ClassesPage() {
                                                 {/* Expandable Row */}
                                                 <AnimatePresence>
                                                     {expandedRowId === cls.id && (
-                                                        <tr>
-                                                            <td colSpan={9} className="p-0 border-none">
-                                                                <EditStudentsRow classRec={cls} />
-                                                            </td>
-                                                        </tr>
+                                                        <>
+                                                            {/* Desktop Expanded Row */}
+                                                            <tr className="hidden md:table-row">
+                                                                <td colSpan={4} className="border-none"></td>
+                                                                <td className="p-0 border-none align-top">
+                                                                    <FinishedLessonsList lessons={cls.finished_lessons} />
+                                                                </td>
+                                                                <td colSpan={2} className="border-none"></td>
+                                                                <td colSpan={2} className="p-0 border-none align-top">
+                                                                    <EditStudentsRow
+                                                                        classRec={cls}
+                                                                        onUpdate={(updated) => handleUpdateStudents(cls.id, updated)}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                            {/* Mobile Expanded Row */}
+                                                            <tr className="md:hidden">
+                                                                <td colSpan={3} className="p-0 border-none">
+                                                                    <div className="flex flex-col p-4 bg-gray-50 dark:bg-slate-800/50 gap-4 border-t border-gray-100 dark:border-gray-700 shadow-inner">
+                                                                        <div>
+                                                                            <h4 className="text-xs font-semibold text-gray-500 mb-1">Đã hoàn thành</h4>
+                                                                            <FinishedLessonsList lessons={cls.finished_lessons} />
+                                                                        </div>
+                                                                        <div>
+                                                                            <h4 className="text-xs font-semibold text-gray-500 mb-1">Học sinh</h4>
+                                                                            <EditStudentsRow
+                                                                                classRec={cls}
+                                                                                onUpdate={(updated) => handleUpdateStudents(cls.id, updated)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        </>
                                                     )}
                                                 </AnimatePresence>
                                             </Fragment>
@@ -776,18 +900,42 @@ export default function ClassesPage() {
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mã lớp</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Mã lớp <span className="text-red-500">*</span>
+                                    </label>
                                     <input
                                         type="text"
                                         value={newClassData.fixed_class_id}
-                                        onChange={(e) => setNewClassData({ ...newClassData, fixed_class_id: e.target.value })}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                        onChange={(e) => {
+                                            setNewClassData({ ...newClassData, fixed_class_id: e.target.value });
+                                            if (errors.classId && e.target.value.trim()) {
+                                                setErrors(prev => ({ ...prev, classId: undefined }));
+                                            }
+                                        }}
+                                        className={`w-full rounded-lg border p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none ${errors.classId ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-700'}`}
                                         placeholder="Ví dụ: C2.34"
                                     />
+                                    <AnimatePresence>
+                                        {errors.classId && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+                                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="flex items-center text-red-500 text-xs gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                                    {errors.classId}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lịch học</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Lịch học <span className="text-red-500">*</span>
+                                    </label>
                                     <div className="flex flex-wrap gap-2">
                                         {SCHEDULE_OPTIONS.map(day => (
                                             <button
@@ -802,6 +950,21 @@ export default function ClassesPage() {
                                             </button>
                                         ))}
                                     </div>
+                                    <AnimatePresence>
+                                        {errors.schedule && (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+                                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="flex items-center text-red-500 text-xs gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                                    {errors.schedule}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -826,6 +989,21 @@ export default function ClassesPage() {
                                             <option value="Kết thúc">Kết thúc</option>
                                         </select>
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Danh sách học sinh
+                                    </label>
+                                    <div>
+                                        <StudentListEditor
+                                            students={newClassData.students}
+                                            onUpdate={(updated) => setNewClassData({ ...newClassData, students: updated })}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-right text-gray-500 mt-1">
+                                        {newClassData.students.length} học sinh
+                                    </p>
                                 </div>
                             </div>
 

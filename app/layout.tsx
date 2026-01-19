@@ -7,6 +7,7 @@ import { Background } from "@/components/Background";
 import { createClient } from "@/utils/supabase/server";
 import { SmoothScrolling } from "@/components/SmoothScrolling";
 import { FaviconManager } from "@/components/FaviconManager";
+import { ConfirmationProvider } from "@/contexts/ConfirmationContext";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["400", "500", "600", "700"],
@@ -36,14 +37,16 @@ export default async function RootLayout({
       >
         <SmoothScrolling>
           <FaviconManager />
-          <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
-            <Background />
-            {/* Main Content Area */}
-            <main className="flex-1 w-full py-8 px-4 md:px-8">
-              {children}
-            </main>
-            <Sidebar isAuthenticated={isAuthenticated} />
-          </div>
+          <ConfirmationProvider>
+            <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
+              <Background />
+              {/* Main Content Area */}
+              <main className="flex-1 w-full py-8 px-4 md:px-8">
+                {children}
+              </main>
+              <Sidebar isAuthenticated={isAuthenticated} />
+            </div>
+          </ConfirmationProvider>
         </SmoothScrolling>
       </body>
     </html>

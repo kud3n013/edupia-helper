@@ -6,6 +6,7 @@ import { parseClassInfo } from "@/utils/class-utils";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Legend, Cell } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/contexts/ConfirmationContext";
 
 // --- Types ---
 interface TeachingRecord {
@@ -41,6 +42,7 @@ const TIME_OPTIONS = [
 
 export default function RecordsPage() {
     const router = useRouter();
+    const confirm = useConfirm();
     const [records, setRecords] = useState<TeachingRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
@@ -253,7 +255,13 @@ export default function RecordsPage() {
 
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.size} buổi học đã chọn?`)) return;
+        if (!await confirm({
+            title: "Xác nhận xóa buổi học",
+            message: `Bạn có chắc chắn muốn xóa ${selectedIds.size} buổi học đã chọn?`,
+            type: 'danger',
+            confirmText: 'Xóa',
+            cancelText: 'Hủy'
+        })) return;
 
         const supabase = createClient();
         const { error } = await supabase
@@ -363,10 +371,46 @@ export default function RecordsPage() {
             const key = r.level || "Unknown";
             grouped[key] = (grouped[key] || 0) + 1;
         });
-        return Object.entries(grouped).map(([name, value]) => ({ name, value }));
+
+        const order = ["Giỏi", "Khá", "Trung bình", "Yếu"];
+        return Object.entries(grouped)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => {
+                const idxA = order.indexOf(a.name);
+                const idxB = order.indexOf(b.name);
+                // If both are in the known list, sort by index
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                // If only A is in list, it comes first
+                if (idxA !== -1) return -1;
+                // If only B is in list, it comes first
+                if (idxB !== -1) return 1;
+                // Otherwise alphabetical
+                return a.name.localeCompare(b.name);
+            });
     }, [filteredRecords]);
 
-    const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#06b6d4', '#e11d48'];
+    const COLORS = [
+        '#6366f1', // Indigo (Primary)
+        '#10b981', // Emerald
+        '#f59e0b', // Amber
+        '#f43f5e', // Rose
+        '#06b6d4', // Cyan
+        '#8b5cf6', // Violet
+        '#84cc16', // Lime
+        '#d946ef', // Fuchsia
+        '#0ea5e9', // Sky
+        '#f97316', // Orange
+        '#14b8a6', // Teal
+        '#ec4899', // Pink
+        '#64748b'  // Slate
+    ];
+    const LEVEL_COLORS: Record<string, string> = {
+        "Giỏi": "#22c55e",      // Green-500
+        "Khá": "#3b82f6",       // Blue-500
+        "Trung bình": "#eab308",// Yellow-500
+        "Yếu": "#ef4444",       // Red-500
+        "Unknown": "#9ca3af"    // Gray-400
+    };
 
     const heatmapData = useMemo(() => {
         // Last 30 days
@@ -627,7 +671,16 @@ export default function RecordsPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">{record.grade}</td>
-                                            <td className="px-4 py-3">{record.level}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${record.level === "Giỏi" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                                                    record.level === "Khá" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                                                        record.level === "Trung bình" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                                            record.level === "Yếu" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                                                "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                                                    }`}>
+                                                    {record.level}
+                                                </span>
+                                            </td>
                                             <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]">
                                                 {formatCurrency(record.rate)}
                                             </td>
@@ -775,7 +828,8 @@ export default function RecordsPage() {
                                         />
                                         <Tooltip
                                             cursor={{ stroke: 'var(--primary-color)', strokeWidth: 1, strokeDasharray: '3 3' }}
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                            contentStyle={{ backgroundColor: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-main)', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+                                            itemStyle={{ color: 'var(--text-main)' }}
                                             formatter={(value: any) => [formatCurrency(value), 'Thu nhập']}
                                         />
                                         <Area
@@ -814,7 +868,11 @@ export default function RecordsPage() {
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: any) => [value, 'Số buổi']} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-main)', borderRadius: '12px' }}
+                                            itemStyle={{ color: 'var(--text-main)' }}
+                                            formatter={(value: any) => [value, 'Số buổi']}
+                                        />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>
@@ -838,10 +896,14 @@ export default function RecordsPage() {
                                             dataKey="value"
                                         >
                                             {pieDataLevel.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                <Cell key={`cell-${index}`} fill={LEVEL_COLORS[entry.name] || COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value: any) => [value, 'Số buổi']} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-main)', borderRadius: '12px' }}
+                                            itemStyle={{ color: 'var(--text-main)' }}
+                                            formatter={(value: any) => [value, 'Số buổi']}
+                                        />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>

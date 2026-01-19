@@ -15,7 +15,8 @@ export interface ClassRecord {
     students: string[];
     schedule: string[];
     time: string;
-    finished_lesson: number;
+    num_finished_lessons: number;
+    finished_lessons: string[];
 }
 
 interface AgendaViewProps {
@@ -32,15 +33,28 @@ export const AgendaView = ({ classes, selectedIds, onToggleSelect, compact = fal
     const startHour = 18;
     const totalHours = 4; // 22 - 18
     const hourHeight = 100; // px per hour
-    const gridCols = "grid-cols-[60px_repeat(7,1fr)]";
+
+    // Responsive grid: 1 col + spacer on mobile, 7 cols + spacer on desktop
+    const gridCols = "grid-cols-[60px_1fr] md:grid-cols-[60px_repeat(7,1fr)]";
 
     const now = new Date();
     // getDay() returns 0 for Sunday, which matches our 'days' array index 0
     const currentDayIndex = now.getDay();
     const currentDayStr = days[currentDayIndex];
 
+    const [activeDayIdx, setActiveDayIdx] = useState(currentDayIndex);
+
+    const handlePrevDay = () => {
+        setActiveDayIdx((prev) => (prev - 1 + 7) % 7);
+    };
+
+    const handleNextDay = () => {
+        setActiveDayIdx((prev) => (prev + 1) % 7);
+    };
+
     const parseTime = (timeStr: string) => {
-        const match = timeStr.match(/(\d+)h(\d+)?/);
+        if (!timeStr) return null;
+        const match = timeStr.match(/(\d+)[:h](\d+)?/);
         if (!match) return null;
         const h = parseInt(match[1]);
         const m = match[2] ? parseInt(match[2]) : 0;
@@ -60,15 +74,25 @@ export const AgendaView = ({ classes, selectedIds, onToggleSelect, compact = fal
         <div className="glass-panel p-4 border border-gray-200 dark:border-gray-700 rounded-xl relative z-0">
             <div className={`grid ${gridCols} gap-4`}>
                 <div className="col-span-1"></div>
-                {days.map(day => (
+                {days.map((day, idx) => (
                     <div
                         key={day}
-                        className={`col-span-1 text-center font-bold py-2 border-b border-gray-200 dark:border-gray-700 ${day === currentDayStr
-                            ? "text-[var(--primary-color)] bg-[var(--primary-color)]/5 rounded-t-lg"
-                            : "text-gray-600 dark:text-gray-300"
+                        className={`col-span-1 text-center font-bold py-2 border-b border-gray-200 dark:border-gray-700 ${idx !== activeDayIdx ? "hidden md:block" : ""
+                            } ${day === currentDayStr
+                                ? "text-[var(--primary-color)] bg-[var(--primary-color)]/5 rounded-t-lg"
+                                : "text-gray-600 dark:text-gray-300"
                             }`}
                     >
-                        {day}
+                        {/* Mobile Navigation Header */}
+                        <div className="flex md:block justify-between items-center">
+                            <button onClick={handlePrevDay} className="md:hidden p-1 text-gray-400 hover:text-[var(--primary-color)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
+                            <span>{day}</span>
+                            <button onClick={handleNextDay} className="md:hidden p-1 text-gray-400 hover:text-[var(--primary-color)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -82,17 +106,18 @@ export const AgendaView = ({ classes, selectedIds, onToggleSelect, compact = fal
                                     {h}:00
                                 </span>
                             </div>
-                            <div className="col-span-7 border-t border-dashed border-gray-200 dark:border-gray-700/50 mt-[1px]"></div>
+                            <div className="col-span-1 md:col-span-7 border-t border-dashed border-gray-200 dark:border-gray-700/50 mt-[1px]"></div>
                         </div>
                     ))}
                 </div>
 
                 <div className={`grid ${gridCols} gap-4 h-full absolute inset-0`}>
                     <div className="col-span-1"></div>
-                    {days.map((day) => (
+                    {days.map((day, idx) => (
                         <div
                             key={day}
-                            className={`col-span-1 relative h-full z-10 ${day === currentDayStr ? "bg-[var(--primary-color)]/5 rounded-b-lg" : ""
+                            className={`col-span-1 relative h-full z-10 ${idx !== activeDayIdx ? "hidden md:block" : ""
+                                } ${day === currentDayStr ? "bg-[var(--primary-color)]/5 rounded-b-lg" : ""
                                 }`}
                         >
                             {classes.filter(c => c.schedule.includes(day)).map(c => {
@@ -153,8 +178,25 @@ export const AgendaView = ({ classes, selectedIds, onToggleSelect, compact = fal
                                                     const supabase = createClient();
                                                     // Call the RPC to reset the draft
                                                     await supabase.rpc('reset_lesson_draft');
+
+                                                    // Calculate next lesson number
+                                                    let nextLessonNum = 1;
+                                                    if (c.finished_lessons && c.finished_lessons.length > 0) {
+                                                        const lessonNums = c.finished_lessons
+                                                            .map(l => parseInt(l))
+                                                            .filter(n => !isNaN(n));
+                                                        if (lessonNums.length > 0) {
+                                                            nextLessonNum = Math.max(...lessonNums) + 1;
+                                                        }
+                                                    }
+                                                    // Pad with zero if needed (though usually lesson numbers in URL like -1, -35 work fine, 
+                                                    // keeping it simple integer is fine, or pad if format was -01)
+                                                    // The user said: "if latest number is 34, the next one would be 35"
+                                                    // So no forced padding explicitly mentioned for >9, but consistency might be nice.
+                                                    // Let's stick to simple integer as requested: "latest lesson number + 1"
+
                                                     // Navigate manually
-                                                    window.location.href = `/lesson?classId=${c.fixed_class_id}-XX`;
+                                                    window.location.href = `/lesson?classId=${c.fixed_class_id}-${nextLessonNum}`;
                                                 }}
                                                 className="text-[10px] bg-white/80 dark:bg-black/40 text-[var(--primary-color)] rounded-full px-3 py-1 opacity-0 group-hover:opacity-100 transition-all hover:bg-[var(--primary-color)] hover:text-white font-semibold shadow-sm backdrop-blur-sm transform hover:scale-105 z-30 relative"
                                             >
