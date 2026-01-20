@@ -150,6 +150,7 @@ export default function LessonPage() {
 
     // --- State: Auto-fill ---
     const [fetchedClassData, setFetchedClassData] = useState<any | null>(null);
+    const skipAutoFillRef = useRef(false);
 
     // --- Effects ---
     useEffect(() => {
@@ -173,7 +174,6 @@ export default function LessonPage() {
         checkDesktop();
         fetchUserGender();
         window.addEventListener('resize', checkDesktop);
-        return () => window.removeEventListener('resize', checkDesktop);
         return () => window.removeEventListener('resize', checkDesktop);
     }, []);
 
@@ -272,7 +272,8 @@ export default function LessonPage() {
                         .select("students, grade, level, num_students")
                         .eq("user_id", user.id)
                         .eq("fixed_class_id", fixedClassId)
-                        .single();
+                        .maybeSingle();
+
 
                     if (classData) {
                         setFetchedClassData(classData);
@@ -281,25 +282,30 @@ export default function LessonPage() {
                         // Only auto-fill if:
                         // 1. No existing record found (recordData is null)
                         // 2. We haven't already typed in students manually? (Hard to track, but we can check if students are default)
+                        // 3. We are NOT restoring from a draft (checked via skipAutoFillRef)
 
                         if (!recordData) {
-                            // Map class students to Student objects
-                            const newStudents = Array.from({ length: MAX_STUDENTS }, (_, i) => ({
-                                id: i,
-                                name: (classData.students && classData.students[i]) ? classData.students[i] : "",
-                                scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
-                                attitudes: [],
-                            }));
+                            if (skipAutoFillRef.current) {
+                                skipAutoFillRef.current = false;
+                            } else {
+                                // Map class students to Student objects
+                                const newStudents = Array.from({ length: MAX_STUDENTS }, (_, i) => ({
+                                    id: i,
+                                    name: (classData.students && classData.students[i]) ? classData.students[i] : "",
+                                    scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
+                                    attitudes: [],
+                                }));
 
-                            setStudents(newStudents);
-                            setStudentCount(classData.num_students || classData.students?.length || 4);
-                            if (classData.grade) setGrade(classData.grade);
-                            if (classData.level) setLevel(classData.level);
+                                setStudents(newStudents);
+                                setStudentCount(classData.num_students || classData.students?.length || 4);
+                                if (classData.grade) setGrade(classData.grade);
+                                if (classData.level) setLevel(classData.level);
 
-                            // Re-eval school level
-                            if (classData.grade) {
-                                if (classData.grade >= 1 && classData.grade <= 5) setSchoolLevel("TH");
-                                else if (classData.grade >= 6 && classData.grade <= 9) setSchoolLevel("THCS");
+                                // Re-eval school level
+                                if (classData.grade) {
+                                    if (classData.grade >= 1 && classData.grade <= 5) setSchoolLevel("TH");
+                                    else if (classData.grade >= 6 && classData.grade <= 9) setSchoolLevel("THCS");
+                                }
                             }
                         }
                     } else {
@@ -327,6 +333,19 @@ export default function LessonPage() {
             confirmText: "Tải lại",
             type: "warning"
         })) {
+            // Use RPC to atomically clear draft and copy record data to draft
+            try {
+                const { createClient } = await import("@/utils/supabase/client");
+                const supabase = createClient();
+                // existingId is the record ID we found
+                if (existingId) {
+                    const { error } = await supabase.rpc('load_record_to_draft', { p_record_id: existingId });
+                    if (error) console.error("Error invoking RPC:", error);
+                }
+            } catch (err) {
+                console.error("Error clearing draft:", err);
+            }
+
             const d = existingRecordData;
             if (d.grade) setGrade(d.grade);
             if (d.level) setLevel(d.level);
@@ -387,15 +406,16 @@ export default function LessonPage() {
                     .from("lessons")
                     .select("*")
                     .eq("user_id", user.id)
-                    .single();
+                    .maybeSingle();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+                if (error) {
                     console.error("Error loading lesson data:", error);
                     return;
                 }
 
 
                 if (data) {
+                    skipAutoFillRef.current = true; // Prevent Class Template overwriting
                     setClassId(data.class_id || "");
                     setGrade(data.grade || null);
                     setLevel(data.level || null);
@@ -863,28 +883,10 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 } else {
                     console.log("Record saved successfully");
 
-                    // Save to public.lessons
-                    if (recordId) {
-                        // First delete existing lessons for this record to avoid duplicates/stale data
-                        await supabase.from('lessons').delete().eq('record_id', recordId);
+                    console.log("Record saved successfully");
 
-                        const lessonsPayload = students.slice(0, studentCount).map(s => ({
-                            record_id: recordId,
-                            student_name: s.name,
-                            absent: s.isAbsent || false,
-                            // Add other fields if needed and if they exist in schema
-                        }));
-
-                        const { error: lessonsError } = await supabase
-                            .from('lessons')
-                            .insert(lessonsPayload);
-
-                        if (lessonsError) {
-                            console.error("Error saving lessons:", lessonsError);
-                        } else {
-                            console.log("Lessons saved successfully");
-                        }
-                    }
+                    // The session log (draft) will be cleared automatically by Supabase Trigger (on_record_save_cleanup_draft)
+                    console.log("Draft cleared by trigger");
                 }
             }
         } catch (err) {

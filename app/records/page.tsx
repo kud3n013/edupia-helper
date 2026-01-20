@@ -101,7 +101,7 @@ export default function RecordsPage() {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data } = await supabase.from('profiles').select('pay_rate').eq('id', user.id).single();
+                const { data } = await supabase.from('profiles').select('pay_rate').eq('id', user.id).maybeSingle();
                 if (data?.pay_rate) {
                     setCurrentPayRate(data.pay_rate);
                 }
