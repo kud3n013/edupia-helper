@@ -102,6 +102,7 @@ export default function LessonPage() {
 
     // --- State: Students ---
     const [studentCount, setStudentCount] = useState(4);
+    const [isGroupClass, setIsGroupClass] = useState(true);
     const [schoolLevel, setSchoolLevel] = useState<"TH" | "THCS">("TH");
     const [knowledgeMode, setKnowledgeMode] = useState<"bulk" | "individual">("individual");
     const [attitudeMode, setAttitudeMode] = useState<"bulk" | "individual">("individual");
@@ -199,6 +200,7 @@ export default function LessonPage() {
 
         setGrade(grade);
         setLevel(level);
+        setIsGroupClass(isGroupClass);
 
         if (grade) {
             if (grade >= 1 && grade <= 5) setSchoolLevel("TH");
@@ -206,11 +208,6 @@ export default function LessonPage() {
         }
 
         // Set student count default based on type
-        // Only if not already set manually? Or force it?
-        // User requested: "determine the max fixed number of students"
-        // Let's set the count to match the type default (1 or 4) if it changes?
-        // Or maybe just clamp it?
-        // Simple approach: Set it to maxStudents.
         setStudentCount(maxStudents);
 
     }, [classId]);
@@ -1067,30 +1064,13 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                         <h2 className="text-2xl font-bold m-0 p-0 text-[var(--text-main)]">
                             2. Danh sách học sinh
                         </h2>
-                        <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
-                            {schoolLevel === 'TH' ? 'Tiểu học' : 'THCS'}
-                        </div>
-                    </div>
-
-                    <div className="mb-8 p-3 -mx-3 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5" ref={studentSectionRef} data-lenis-prevent>
-                        <div className="flex items-center gap-4 mb-2">
-                            <label htmlFor="studentCountInput" className="font-medium m-0">Số lượng học sinh:</label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                id="studentCountInput"
-                                min="1"
-                                max="6"
-                                value={studentCount}
-                                onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    if (!isNaN(val)) {
-                                        setStudentCount(Math.max(1, Math.min(6, val)));
-                                    }
-                                }}
-                                className="w-20 text-center p-2 border border-gray-300 rounded-[var(--radius-md)] bg-white dark:bg-gray-800 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[var(--primary-color)] font-bold text-lg"
-                            />
+                        <div className="flex gap-2">
+                            <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm border border-[var(--primary-color)]/20">
+                                {isGroupClass ? "Lớp 1-4" : "Lớp 1-1"}
+                            </div>
+                            <div className="px-4 py-1 rounded-full bg-[var(--primary-color)]/10 text-[var(--primary-color)] font-bold text-sm">
+                                {schoolLevel === 'TH' ? 'Tiểu học' : 'THCS'}
+                            </div>
                         </div>
                     </div>
 
@@ -1228,8 +1208,9 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                                             </label>
                                                             <div className="flex items-center gap-3">
                                                                 <Slider
-                                                                    min={1}
+                                                                    min={0}
                                                                     max={10}
+                                                                    step={0.5}
                                                                     value={val}
                                                                     onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
                                                                     className="flex-1"
