@@ -81,6 +81,33 @@ interface Student {
     isAbsent?: boolean;
 }
 
+function ScoreValue({ value }: { value: number }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        copyToClipboard(value.toString(), () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        });
+    };
+
+    return (
+        <div
+            onClick={handleCopy}
+            className="font-bold text-[var(--primary-color)] w-[24px] text-right tabular-nums cursor-pointer flex items-center justify-end select-none"
+            title="Click to copy"
+        >
+            {copied ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 animate-in zoom-in spin-in-90 duration-300">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            ) : (
+                value
+            )}
+        </div>
+    );
+}
+
 export default function LessonPage() {
     // --- Hooks ---
     const lenis = useLenis();
@@ -665,10 +692,11 @@ export default function LessonPage() {
         }
 
         // Check override early to prevent generation if cancelled
-        if (existingId) {
+        // Check override early to prevent generation if cancelled
+        if (existingId || duplicateWarning) {
             if (!await confirm({
                 title: "Xác nhận ghi đè",
-                message: "Cảnh báo: Dữ liệu của lớp này đã tồn tại. Bạn có chắc chắn muốn ghi đè (Override) không?",
+                message: "Bạn có chắc chắn muốn xóa kết quả cũ và tạo lại không?",
                 type: "warning",
                 confirmText: "Ghi đè"
             })) {
@@ -857,22 +885,17 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                 let recordId = existingId;
                 let error = null;
 
-                if (existingId) {
-                    const { error: updateError } = await supabase
-                        .from('records')
-                        .update(recordPayload)
-                        .eq('id', existingId);
-                    error = updateError;
-                } else {
-                    const { data: newRecord, error: insertError } = await supabase
-                        .from('records')
-                        .insert(recordPayload)
-                        .select()
-                        .single();
-                    error = insertError;
-                    if (newRecord) {
-                        recordId = newRecord.id;
-                    }
+                // ALWAYS Perform INSERT (Trigger will handle deletion of old records)
+                console.log("Saving new record... (Trigger will delete old one if exists)");
+
+                const { data: newRecord, error: insertError } = await supabase
+                    .from('records')
+                    .insert(recordPayload)
+                    .select()
+                    .single();
+                error = insertError;
+                if (newRecord) {
+                    recordId = newRecord.id;
                 }
 
                 if (error) {
@@ -1215,7 +1238,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                                                     onChange={(newVal) => handleScoreChange(criteria, newVal, i)}
                                                                     className="flex-1"
                                                                 />
-                                                                <span className="font-bold text-[var(--primary-color)] w-[24px] text-righttabular-nums">{val}</span>
+                                                                <ScoreValue value={val} />
                                                             </div>
                                                         </motion.div>
                                                     );
