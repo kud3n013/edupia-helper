@@ -9,6 +9,7 @@ import { Reorder, AnimatePresence, motion } from "framer-motion";
 import { useLenis } from "@/components/SmoothScrolling";
 import { useSearchParams } from "next/navigation";
 import { useConfirm } from "@/contexts/ConfirmationContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- Constants ---
 const MAX_STUDENTS = 6;
@@ -24,49 +25,33 @@ const CRITERIA_LIST = [
 ];
 
 const ATTITUDE_DATA: Record<string, string[]> = {
-    "Năng lượng / Tinh thần": [
-        "tích cực",
-        "sôi nổi",
-        "vui vẻ",
-        "hứng thú",
-        "tự tin",
-        "lạc quan",
-        "mệt mỏi",
-        "chán nản",
-        "trầm tính",
-        "tự ti",
-        "xấu hổ",
-        "ngại nói",
+    "Tinh thần": [
+        "😎 Tích cực, tự tin",
+        "🤪 Vui vẻ, hài hước",
+        "🤐 Trầm tính, nhút nhát",
+        "🥱 Uể oải, thiếu hứng thú",
     ],
-    "Khả năng tập trung": [
-        "tập trung nghe giảng",
-        "chú ý bài học",
-        "tích cực phát biểu",
-        "sao nhãng",
-        "làm việc riêng",
-        "không tập trung",
-        "lơ là",
+    "Tập trung học": [
+        "🌟 Sôi nổi nhất lớp",
+        "👋 Tích cực phát biểu",
+        "🫵 Hay mất tập trung",
+        "🙄 Học đối phó",
     ],
-    "Thái độ với bạn học": [
-        "hòa đồng",
-        "biết chia sẻ",
-        "giúp đỡ bạn bè",
-        "nóng nảy",
-        "chưa hòa đồng",
-    ],
-    "Thái độ với giáo viên": [
-        "biết nghe lời",
-        "lễ phép",
-        "ngoan ngoãn",
-        "chưa vâng lời",
-        "phải nhắc nhở nhiều",
+    "Thái độ trong lớp": [
+        "😇 Ngoan ngoãn, lễ phép",
+        "🫂 Hòa đồng, hay giúp đỡ",
+        "👿 Vô lễ",
+        "🤬 Gây gổ / Ganh đua tiêu cực",
     ],
     "Giờ giấc": [
-        "Vào lớp sớm",
-        "Vào trễ ít phút",
-        "Vào lớp trễ",
-        "Xin phép nghỉ sớm",
-        "Rời lớp sớm không phép",
+        "⏰ Đúng giờ",
+        "🏃 Xin về sớm",
+        "⏰ Vào muộn",
+        "🏃 Tự ý về sớm",
+    ],
+    "Bài tập": [
+        "📚 Hoàn thành BTVN",
+        "📚 Thiếu BTVN",
     ],
 };
 
@@ -113,6 +98,7 @@ export default function LessonPage() {
     const lenis = useLenis();
     const confirm = useConfirm();
     const searchParams = useSearchParams();
+    const { user, loading: authLoading } = useAuth();
 
     // --- State: General & Lesson Info ---
     const [classId, setClassId] = useState("");
@@ -186,24 +172,16 @@ export default function LessonPage() {
             setIsDesktop(window.innerWidth >= 768);
         };
 
-        const fetchUserGender = async () => {
-            try {
-                const { createClient } = await import("@/utils/supabase/client");
-                const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user?.user_metadata?.gender) {
-                    setGender(user.user_metadata.gender);
-                }
-            } catch (error) {
-                console.error("Error fetching gender:", error);
-            }
-        };
-
         checkDesktop();
-        fetchUserGender();
         window.addEventListener('resize', checkDesktop);
         return () => window.removeEventListener('resize', checkDesktop);
     }, []);
+
+    useEffect(() => {
+        if (user?.user_metadata?.gender) {
+            setGender(user.user_metadata.gender);
+        }
+    }, [user]);
 
     // Load Class ID from URL
     useEffect(() => {
@@ -248,13 +226,53 @@ export default function LessonPage() {
             return;
         }
 
+        const recordIdParam = searchParams.get("recordId");
+
         const checkData = async () => {
             try {
+                if (!user) return;
+
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
 
-                if (!user) return;
+                // 0. Priority: Load SPECIFIC record if "Edit" mode (recordId present)
+                if (recordIdParam) {
+                    const { data: recordData } = await supabase
+                        .from("records")
+                        .select("*")
+                        .eq("id", recordIdParam)
+                        .maybeSingle();
+
+                    if (recordData) {
+                        // Immediately Load Data
+                        skipAutoFillRef.current = true; // Block template auto-fill
+                        setExistingId(recordData.id);
+
+                        // Populate State
+                        if (recordData.grade) setGrade(recordData.grade);
+                        if (recordData.level) setLevel(recordData.level);
+                        if (recordData.lesson_content) setLessonContent(recordData.lesson_content);
+                        if (recordData.atmosphere_checked !== undefined) setAtmosphereChecked(recordData.atmosphere_checked);
+                        if (recordData.atmosphere_value) setAtmosphereValue(recordData.atmosphere_value);
+                        if (recordData.progress_checked !== undefined) setProgressChecked(recordData.progress_checked);
+                        if (recordData.progress_value) setProgressValue(recordData.progress_value);
+                        if (recordData.student_count) setStudentCount(recordData.student_count);
+                        if (recordData.students) setStudents(recordData.students);
+                        if (recordData.session_number) setSessionNumber(recordData.session_number);
+                        if (recordData.reminders) setReminders(recordData.reminders);
+
+                        // Re-derive school level
+                        if (recordData.grade) {
+                            if (recordData.grade >= 1 && recordData.grade <= 5) setSchoolLevel("TH");
+                            else if (recordData.grade >= 6 && recordData.grade <= 9) setSchoolLevel("THCS");
+                        }
+
+                        // No warnings, we are editing explicitly
+                        setDuplicateWarning(null);
+                        setExistingRecordData(null);
+                        return; // Done
+                    }
+                }
 
                 // 1. Check for existing record (Priority 1)
                 const { data: recordData } = await supabase
@@ -267,10 +285,37 @@ export default function LessonPage() {
                     .maybeSingle();
 
                 if (recordData) {
-                    setDuplicateWarning(`Lớp này đã được tạo feedback ngày ${recordData.date}`);
-                    setExistingId(recordData.id);
+                    // Check if it's a pending automated record
+                    if (recordData.status === "Chưa mở lớp") {
+                        // It's a valid record waiting to be filled. Not a duplicate warning case.
+                        // But we want to use its ID so we update it (UPSERT/UPDATE) instead of creating new.
+                        setExistingId(recordData.id);
+                        setDuplicateWarning(null);
+                        // We might want to load its pre-filled date/students if they exist?
+                        // The existing logic below handles loading if user confirms, but here we probably
+                        // want to silently "adopt" this record ID.
+                        if (recordData.students) {
+                            // Use the pre-filled students from DB if available!
+                            setStudents(recordData.students);
+                            if (recordData.student_count) setStudentCount(recordData.student_count);
+                        }
+                    } else {
+                        // Only show warning if NOT editing (which is handled above, but double check ID)
+                        if (recordData.id !== recordIdParam) {
+                            setDuplicateWarning(`Lớp này đã được tạo feedback ngày ${recordData.date}`);
+                            setExistingId(recordData.id);
+                        } else {
+                            // Should be covered by step 0, but fallback
+                            setExistingId(recordData.id);
+                        }
+                    }
                     if (recordData.lesson_content) {
-                        setExistingRecordData(recordData);
+                        // Only show "Load Old?" if NOT editing same record
+                        if (recordData.id !== recordIdParam) {
+                            setExistingRecordData(recordData);
+                        } else {
+                            setExistingRecordData(null);
+                        }
                     } else {
                         setExistingRecordData(null);
                     }
@@ -308,7 +353,7 @@ export default function LessonPage() {
                         // 2. We haven't already typed in students manually? (Hard to track, but we can check if students are default)
                         // 3. We are NOT restoring from a draft (checked via skipAutoFillRef)
 
-                        if (!recordData) {
+                        if (!recordData && !recordIdParam) { // Added check for recordIdParam
                             if (skipAutoFillRef.current) {
                                 skipAutoFillRef.current = false;
                             } else {
@@ -346,7 +391,7 @@ export default function LessonPage() {
 
         const timeoutId = setTimeout(checkData, 500); // 500ms debounce
         return () => clearTimeout(timeoutId);
-    }, [classId]);
+    }, [classId, user, searchParams]); // Added searchParams dependency
 
     const handleLoadOldFeedback = async () => {
         if (!existingRecordData) return;
@@ -417,14 +462,18 @@ export default function LessonPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     // 1. Fetch data on mount
+    // 1. Fetch data on mount
     useEffect(() => {
+        if (authLoading) return;
+
         const loadLessonData = async () => {
             try {
+                if (!user) return;
+
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
 
-                if (!user) return;
+                // Removed getUser call
 
                 const { data, error } = await supabase
                     .from("lessons")
@@ -466,7 +515,7 @@ export default function LessonPage() {
         };
 
         loadLessonData();
-    }, []);
+    }, [user, authLoading]);
 
     // 2. Save data on change (Autosave with debounce)
     useEffect(() => {
@@ -474,11 +523,10 @@ export default function LessonPage() {
 
         const saveData = async () => {
             try {
+                if (!user) return;
+
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
-                const { data: { user } } = await supabase.auth.getUser();
-
-                if (!user) return;
 
                 const payload = {
                     user_id: user.id,
@@ -534,7 +582,8 @@ export default function LessonPage() {
         includedAttitudeCategories,
         students,
         sessionNumber,
-        reminders
+        reminders,
+        user
     ]);
 
 
@@ -619,20 +668,29 @@ export default function LessonPage() {
 
     const isValidPositive = (tag: string) => {
         return [
-            'tích cực', 'sôi nổi', 'vui vẻ', 'hứng thú', 'tự tin', 'lạc quan',
-            'tập trung nghe giảng', 'chú ý bài học', 'tích cực phát biểu',
-            'hòa đồng', 'biết chia sẻ', 'giúp đỡ bạn bè',
-            'biết nghe lời', 'lễ phép', 'ngoan ngoãn',
-            'Vào lớp sớm'
+            "😎 Tích cực, tự tin",
+            "🤪 Vui vẻ, hài hước",
+            "🌟 Sôi nổi nhất lớp",
+            "👋 Tích cực phát biểu",
+            "😇 Ngoan ngoãn, lễ phép",
+            "🫂 Hòa đồng, hay giúp đỡ",
+            "⏰ Đúng giờ",
+            "🏃 Xin về sớm",
+            "📚 Hoàn thành BTVN"
         ].includes(tag);
     };
 
     const isValidNegative = (tag: string) => {
         return [
-            'mệt mỏi', 'chán nản', 'trầm tính', 'tự ti', 'xấu hổ', 'ngại nói',
-            'sao nhãng', 'làm việc riêng', 'không tập trung', 'lơ là',
-            'nóng nảy', 'chưa hòa đồng', 'chưa vâng lời', 'phải nhắc nhở nhiều',
-            'Vào trễ ít phút', 'Vào lớp trễ', 'Rời lớp sớm không phép'
+            "🤐 Trầm tính, nhút nhát",
+            "🥱 Uể oải, thiếu hứng thú",
+            "🫵 Hay mất tập trung",
+            "🙄 Học đối phó",
+            "👿 Vô lễ",
+            "🤬 Gây gổ / Ganh đua tiêu cực",
+            "⏰ Vào muộn",
+            "🏃 Tự ý về sớm",
+            "📚 Thiếu BTVN"
         ].includes(tag);
     };
 
@@ -729,7 +787,6 @@ export default function LessonPage() {
         // Attendance from "Giờ giấc" tags
         // Attendance from "Giờ giấc" tags & Absence check
         const lateStudents: string[] = [];
-        const slightLateStudents: string[] = [];
         const earlyLeavePermitted: string[] = [];
         const earlyLeaveUnpermitted: string[] = [];
         const absentStudents: string[] = [];
@@ -738,16 +795,14 @@ export default function LessonPage() {
             if (s.isAbsent) {
                 absentStudents.push(s.name);
             } else {
-                if (s.attitudes.includes("Vào lớp trễ")) lateStudents.push(s.name);
-                if (s.attitudes.includes("Vào trễ ít phút")) slightLateStudents.push(s.name);
-                if (s.attitudes.includes("Xin phép nghỉ sớm")) earlyLeavePermitted.push(s.name);
-                if (s.attitudes.includes("Rời lớp sớm không phép")) earlyLeaveUnpermitted.push(s.name);
+                if (s.attitudes.includes("⏰ Vào muộn")) lateStudents.push(s.name);
+                if (s.attitudes.includes("🏃 Xin về sớm")) earlyLeavePermitted.push(s.name);
+                if (s.attitudes.includes("🏃 Tự ý về sớm")) earlyLeaveUnpermitted.push(s.name);
             }
         });
 
         if (absentStudents.length > 0) reportSentences.push(`Bạn ${absentStudents.join(", ")} vắng mặt`);
         if (lateStudents.length > 0) reportSentences.push(`Bạn ${lateStudents.join(", ")} vào muộn`);
-        if (slightLateStudents.length > 0) reportSentences.push(`Bạn ${slightLateStudents.join(", ")} vào trễ một chút`);
         if (earlyLeavePermitted.length > 0) reportSentences.push(`Bạn ${earlyLeavePermitted.join(", ")} xin phép nghỉ sớm`);
         if (earlyLeaveUnpermitted.length > 0) reportSentences.push(`Bạn ${earlyLeaveUnpermitted.join(", ")} thoát lớp trước mà không xin phép`);
 
@@ -794,7 +849,7 @@ export default function LessonPage() {
 
             const prompt = `### Feedback cho học sinh: ${name}
 
-Hãy đóng vai trò là một ${teacherPronoun} giáo tiếng Anh. Dựa trên thông tin dưới đây, hãy viết một đoạn nhận xét ngắn gọn (khoảng 25-50 chữ) bằng tiếng Việt dành cho phụ huynh. Sử dụng ngôn ngữ trực tiếp, thẳng thắn, không dùng lời khen sáo rỗng hay chỉ trích gay gắt.
+Hãy đóng vai trò là một ${teacherPronoun} giáo tiếng Anh. Dựa trên thông tin dưới đây, hãy viết một đoạn nhận xét ngắn gọn (khoảng 50-75 chữ) bằng tiếng Việt dành cho phụ huynh. Sử dụng ngôn ngữ trực tiếp, thẳng thắn, không dùng lời khen sáo rỗng hay chỉ trích gay gắt.
 ${pronounInstruction}
 
 
@@ -842,7 +897,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
 
             const { createClient } = await import("@/utils/supabase/client");
             const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            // Removed getUser logic
 
             if (user) {
                 // Get latest pay_rate from previous record or default 'D'
@@ -1324,18 +1379,30 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                                                                 const isNeg = isValidNegative(tag);
                                                                 const isChecked = students[i].attitudes.includes(tag);
 
+                                                                // Extract icon (first part) and text (rest)
+                                                                const parts = tag.split(" ");
+                                                                const icon = parts[0];
+                                                                const text = parts.slice(1).join(" ");
+
                                                                 return (
-                                                                    <label key={tag} className={`inline-block px-2 py-1 rounded-[12px] border cursor-pointer select-none text-[0.7rem] transition-all 
+                                                                    <label
+                                                                        key={tag}
+                                                                        title={text}
+                                                                        className={`inline-flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer select-none text-xl transition-all 
                                                           ${isChecked
-                                                                            ? (isPos ? 'bg-green-500 border-green-500 text-white shadow-sm' : (isNeg ? 'bg-red-500 border-red-500 text-white shadow-sm' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-sm'))
-                                                                            : 'bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700'
-                                                                        }
+                                                                                ? (isPos ? 'bg-green-500 border-green-600 text-white shadow-md scale-110 dark:bg-green-600 dark:border-green-500' : (isNeg ? 'bg-red-500 border-red-600 text-white shadow-md scale-110 dark:bg-red-600 dark:border-red-500' : 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white shadow-md scale-110'))
+                                                                                : (isPos
+                                                                                    ? 'bg-green-50/50 border-green-100 hover:bg-green-100 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800/50 dark:hover:bg-green-900/40 dark:hover:border-green-700 hover:scale-105'
+                                                                                    : (isNeg
+                                                                                        ? 'bg-red-50/50 border-red-100 hover:bg-red-100 hover:border-red-300 dark:bg-red-900/20 dark:border-red-800/50 dark:hover:bg-red-900/40 dark:hover:border-red-700 hover:scale-105'
+                                                                                        : 'bg-white border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700 hover:scale-105'))
+                                                                            }
                                                       `}>
                                                                         <input type="checkbox" className="hidden"
                                                                             checked={isChecked}
                                                                             onChange={(e) => handleAttitudeChange(tag, e.target.checked, i)}
                                                                         />
-                                                                        {tag}
+                                                                        {icon}
                                                                     </label>
                                                                 );
                                                             })}

@@ -199,6 +199,7 @@ export default function ClassesPage() {
     });
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
     // Expanded Rows for Student Editing
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
@@ -365,13 +366,34 @@ export default function ClassesPage() {
         }
     };
 
-    const toggleSelectRow = (id: string) => {
+    const toggleSelectRow = (id: string, index?: number, shiftKey?: boolean) => {
         const newSelected = new Set(selectedIds);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
+
+        if (shiftKey && lastSelectedId !== null && index !== undefined) {
+            // Range Selection
+            const lastIndex = sortedClasses.findIndex(c => c.id === lastSelectedId);
+            if (lastIndex !== -1) {
+                const start = Math.min(index, lastIndex);
+                const end = Math.max(index, lastIndex);
+
+                // Add all items in range (inclusive)
+                for (let i = start; i <= end; i++) {
+                    if (sortedClasses[i]) {
+                        newSelected.add(sortedClasses[i].id);
+                    }
+                }
+            }
         } else {
-            newSelected.add(id);
+            // Standard/Ctrl Click Selection
+            if (newSelected.has(id)) {
+                newSelected.delete(id);
+                setLastSelectedId(null);
+            } else {
+                newSelected.add(id);
+                setLastSelectedId(id);
+            }
         }
+
         setSelectedIds(newSelected);
     };
 
@@ -785,19 +807,22 @@ export default function ClassesPage() {
                                     ) : sortedClasses.length === 0 ? (
                                         <tr><td colSpan={9} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
                                     ) : (
-                                        sortedClasses.map((cls) => (
+                                        sortedClasses.map((cls, index) => (
                                             <Fragment key={cls.id}>
                                                 <tr
                                                     key={cls.id}
-                                                    onClick={() => toggleSelectRow(cls.id)}
+                                                    onClick={(e) => toggleSelectRow(cls.id, index, e.shiftKey)}
                                                     className={`hover: bg - gray - 50 dark: hover: bg - gray - 800 / 50 transition - colors cursor - pointer ${selectedIds.has(cls.id) ? "bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20" : ""} `}
                                                 >
                                                     <td className="px-4 py-3 hidden md:table-cell">
                                                         <input
                                                             type="checkbox"
                                                             checked={selectedIds.has(cls.id)}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            onChange={() => toggleSelectRow(cls.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleSelectRow(cls.id, index, e.shiftKey);
+                                                            }}
+                                                            onChange={(e) => toggleSelectRow(cls.id, index, (e.nativeEvent as any).target?.shiftKey || (e.nativeEvent as KeyboardEvent).shiftKey)}
                                                             className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
                                                         />
                                                     </td>

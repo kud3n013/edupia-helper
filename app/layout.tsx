@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/server";
 import { SmoothScrolling } from "@/components/SmoothScrolling";
 import { FaviconManager } from "@/components/FaviconManager";
 import { ConfirmationProvider } from "@/contexts/ConfirmationContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["400", "500", "600", "700"],
@@ -36,17 +37,19 @@ export default async function RootLayout({
         className={`${beVietnamPro.variable} font-sans antialiased`}
       >
         <SmoothScrolling>
-          <FaviconManager />
-          <ConfirmationProvider>
-            <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
-              <Background />
-              {/* Main Content Area */}
-              <main className="flex-1 w-full py-8 px-4 md:px-8">
-                {children}
-              </main>
-              <Sidebar isAuthenticated={isAuthenticated} />
-            </div>
-          </ConfirmationProvider>
+          <AuthProvider>
+            <FaviconManager />
+            <ConfirmationProvider>
+              <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
+                <Background />
+                {/* Main Content Area */}
+                <main className="flex-1 w-full py-8 px-4 md:px-8">
+                  {children}
+                </main>
+                <Sidebar isAuthenticated={isAuthenticated} />
+              </div>
+            </ConfirmationProvider>
+          </AuthProvider>
         </SmoothScrolling>
       </body>
     </html>

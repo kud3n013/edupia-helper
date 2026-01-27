@@ -45,7 +45,7 @@ export const parseClassInfo = (classId: string): ClassInfo => {
             const levelMap: Record<string, string> = {
                 'A': 'Giỏi',
                 'B': 'Khá',
-                'C': 'Trung bình',
+                'C': 'TB',
                 'D': 'Yếu'
             };
             level = levelMap[l] || null;

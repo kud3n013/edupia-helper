@@ -7,6 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/contexts/ConfirmationContext";
+import { ClassRecord } from "@/components/AgendaView";
 
 // --- Types ---
 interface TeachingRecord {
@@ -44,6 +45,7 @@ export default function RecordsPage() {
     const router = useRouter();
     const confirm = useConfirm();
     const [records, setRecords] = useState<TeachingRecord[]>([]);
+    const [classes, setClasses] = useState<ClassRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
     const [currentPayRate, setCurrentPayRate] = useState<string>("B+"); // User preference - fetched from profile
@@ -58,6 +60,7 @@ export default function RecordsPage() {
     const [viewMode, setViewMode] = useState<"list" | "analytic">("list");
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 
     // Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -97,6 +100,14 @@ export default function RecordsPage() {
 
     useEffect(() => {
         const initData = async () => {
+            // 1. Trigger Automation (Fire and forget, or await?)
+            // We await so we fetch the newly created records immediately
+            try {
+                await fetch("/api/records/generate", { method: "POST" });
+            } catch (e) {
+                console.error("Auto-generation failed", e);
+            }
+
             await fetchRecords();
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
@@ -105,6 +116,9 @@ export default function RecordsPage() {
                 if (data?.pay_rate) {
                     setCurrentPayRate(data.pay_rate);
                 }
+                // Fetch Classes map for Smart Edit
+                const { data: classesData } = await supabase.from('classes').select('*').eq('user_id', user.id);
+                if (classesData) setClasses(classesData);
             }
         };
         initData();
@@ -286,13 +300,34 @@ export default function RecordsPage() {
         }
     };
 
-    const toggleSelectRow = (id: string) => {
+    const toggleSelectRow = (id: string, index?: number, shiftKey?: boolean) => {
         const newSelected = new Set(selectedIds);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
+
+        if (shiftKey && lastSelectedId !== null && index !== undefined) {
+            // Range Selection
+            const lastIndex = sortedRecords.findIndex(r => r.id === lastSelectedId);
+            if (lastIndex !== -1) {
+                const start = Math.min(index, lastIndex);
+                const end = Math.max(index, lastIndex);
+
+                // Add all items in range (inclusive)
+                for (let i = start; i <= end; i++) {
+                    if (sortedRecords[i]) {
+                        newSelected.add(sortedRecords[i].id);
+                    }
+                }
+            }
         } else {
-            newSelected.add(id);
+            // Standard/Ctrl Click Selection
+            if (newSelected.has(id)) {
+                newSelected.delete(id);
+                setLastSelectedId(null); // Clear last selected if unselecting? Or keep it? Usually keep unless everything cleared.
+            } else {
+                newSelected.add(id);
+                setLastSelectedId(id);
+            }
         }
+
         setSelectedIds(newSelected);
     };
 
@@ -301,6 +336,18 @@ export default function RecordsPage() {
             key,
             direction: prev.key === key && prev.direction === "desc" ? "asc" : "desc",
         }));
+    };
+
+    const handleEdit = async (record: TeachingRecord) => {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Clean slate: Delete current draft in 'lessons' table
+        await supabase.from('lessons').delete().eq('user_id', user.id);
+
+        // Navigate with recordId to trigger load
+        router.push(`/lesson?classId=${record.class_id}&recordId=${record.id}`);
     };
 
     // --- Updates ---
@@ -372,7 +419,7 @@ export default function RecordsPage() {
             grouped[key] = (grouped[key] || 0) + 1;
         });
 
-        const order = ["Giỏi", "Khá", "Trung bình", "Yếu"];
+        const order = ["Giỏi", "Khá", "TB", "Yếu"];
         return Object.entries(grouped)
             .map(([name, value]) => ({ name, value }))
             .sort((a, b) => {
@@ -407,7 +454,7 @@ export default function RecordsPage() {
     const LEVEL_COLORS: Record<string, string> = {
         "Giỏi": "#22c55e",      // Green-500
         "Khá": "#3b82f6",       // Blue-500
-        "Trung bình": "#eab308",// Yellow-500
+        "TB": "#eab308",// Yellow-500
         "Yếu": "#ef4444",       // Red-500
         "Unknown": "#9ca3af"    // Gray-400
     };
@@ -647,23 +694,33 @@ export default function RecordsPage() {
                                 ) : sortedRecords.length === 0 ? (
                                     <tr><td colSpan={10} className="p-8 text-center text-gray-500">Chưa có dữ liệu buổi học.</td></tr>
                                 ) : (
-                                    sortedRecords.map((record) => (
-                                        <tr key={record.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${selectedIds.has(record.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}>
+                                    sortedRecords.map((record, index) => (
+                                        <tr
+                                            key={record.id}
+                                            onClick={(e) => toggleSelectRow(record.id, index, e.shiftKey)}
+                                            className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group ${selectedIds.has(record.id) ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}`}
+                                        >
                                             <td className="px-4 py-3">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedIds.has(record.id)}
-                                                    onChange={() => toggleSelectRow(record.id)}
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onChange={(e) => toggleSelectRow(record.id, index, (e.nativeEvent as any).target?.shiftKey || (e.nativeEvent as KeyboardEvent).shiftKey)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleSelectRow(record.id, index, e.shiftKey);
+                                                    }}
                                                     className="appearance-none w-4 h-4 rounded-full border-2 border-gray-300 checked:bg-[var(--primary-color)] checked:border-[var(--primary-color)] checked:bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2024%2024%22%20stroke%3D%22white%22%3E%3Cpath%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%224%22%20d%3D%22M5%2013l4%204L19%207%22%2F%3E%3C%2Fsvg%3E')] checked:bg-center checked:bg-no-repeat checked:bg-[length:70%] cursor-pointer transition-all"
                                                 />
                                             </td>
                                             <td className="px-4 py-3 font-medium">
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => router.push(`/lesson?classId=${record.class_id}`)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEdit(record);
+                                                        }}
                                                         className="p-1.5 text-gray-500 hover:text-[var(--primary-color)] hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-all"
-                                                        title="Chỉnh sửa feedback"
+                                                        title="Chíh sửa feedback"
                                                     >
                                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
                                                     </button>
@@ -674,7 +731,7 @@ export default function RecordsPage() {
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${record.level === "Giỏi" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
                                                     record.level === "Khá" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                                                        record.level === "Trung bình" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                                        record.level === "TB" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
                                                             record.level === "Yếu" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
                                                                 "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                                                     }`}>

@@ -27,7 +27,7 @@ BEGIN
     CASE v_level_char
       WHEN 'A' THEN NEW.level := 'Giỏi';
       WHEN 'B' THEN NEW.level := 'Khá';
-      WHEN 'C' THEN NEW.level := 'Trung bình';
+      WHEN 'C' THEN NEW.level := 'TB';
       WHEN 'D' THEN NEW.level := 'Yếu';
       ELSE
          -- Keep existing level if valid, or null? 
