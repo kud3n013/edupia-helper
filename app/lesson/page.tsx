@@ -45,9 +45,9 @@ const ATTITUDE_DATA: Record<string, string[]> = {
     ],
     "Giờ giấc": [
         "⏰ Đúng giờ",
-        "🏃 Xin về sớm",
+        "🏃 Xin thoát lớp sớm",
         "⏰ Vào muộn",
-        "🏃 Tự ý về sớm",
+        "🏃 Tự ý thoát lớp sớm",
     ],
     "Bài tập": [
         "📚 Hoàn thành BTVN",
