@@ -1,23 +1,26 @@
 # Edupia Helper
 
-A comprehensive helper tool designed for Edupia teachers to generate quick feedback, manage student groups, and track lesson progress. This application features a modern, glassmorphic UI and robust authentication powered by Supabase.
+A comprehensive helper tool designed for Edupia teachers to generate quick feedback, manage student groups, track lesson progress, and organize schedules. This application features a modern, glassmorphic UI and robust authentication powered by Supabase.
 
 ## 🚀 Features
 
 *   **Authentication**: Secure Sign In and Sign Up system using Supabase Auth (Email/Password).
-*   **User Profiles**: automatically creates user profiles with Full Name upon registration.
-*   **Protected Routes**: Secure access to `/students` and `/lesson` pages, ensuring only authenticated users can access them.
-*   **Smart Navigation**: "Login Required" modal for guest users attempting to access protected features.
-*   **Modern UI**: Beautiful Glassmorphism design system using Tailwind CSS.
+*   **User Profiles**: Automatically creates user profiles with Full Name upon registration.
+*   **Classes Management**: Organize students into classes for easier management.
+*   **Records Tracking**: Keep track of student performance and lesson records with multi-selection capabilities.
+*   **Timetable & Calendar**: View and manage schedules with Calendar Sync integration.
+*   **Protected Routes**: Secure access to protected pages (`/students`, `/lesson`, `/classes`, `/records`), ensuring only authenticated users can access them.
+*   **Modern UI**: Beautiful Glassmorphism design system using Tailwind CSS and Framer Motion.
 *   **Dark Mode**: Optimized dark mode interface by default.
 *   **Vietnamese Support**: Full Vietnamese language support for UI and feedback generation.
 
 ## 🛠️ Tech Stack
 
-*   **Framework**: [Next.js 14+](https://nextjs.org/) (App Router)
+*   **Framework**: [Next.js 16+](https://nextjs.org/) (App Router)
 *   **Language**: TypeScript
-*   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+*   **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
 *   **Backend/Auth**: [Supabase](https://supabase.com/)
+*   **Database Management**: Supabase CLI
 *   **Icons**: Lucide React / Custom SVGs
 
 ## 🏁 Getting Started
@@ -44,59 +47,22 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### 4. Database Setup (Supabase)
+### 4. Database Setup (Supabase CLI)
 
-To enable user profiles and authentication features, run the following SQL script in your Supabase SQL Editor. This sets up the `profiles` table and necessary triggers.
+This project uses Supabase CLI for type generation and database interactions.
 
-```sql
--- 1. CLEANUP (Drop existing objects to avoid conflicts)
-drop trigger if exists on_auth_user_created on auth.users;
-drop function if exists public.handle_new_user();
-drop table if exists public.profiles cascade;
-
--- 2. TABLE SETUP
-create table public.profiles (
-  id uuid references auth.users on delete cascade not null primary key,
-  updated_at timestamp with time zone default now(),
-  email text,
-  full_name text,
-  avatar_url text
-);
-
--- 3. PERMISSIONS
-alter table public.profiles enable row level security;
-grant all on public.profiles to postgres, anon, authenticated, service_role;
-
--- 4. POLICIES (Permissive for easy setup)
-create policy "Enable all access for all users" on public.profiles
-  for all using (true) with check (true);
-
--- 5. TRIGGER FUNCTION
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, full_name, avatar_url)
-  values (
-    new.id, 
-    new.email, 
-    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1), 'User'),
-    new.raw_user_meta_data->>'avatar_url'
-  );
-  return new;
-exception
-  when others then
-    raise warning 'Profile creation failed: %', sqlerrm;
-    return new;
-end;
-$$ language plpgsql security definer;
-
--- 6. TRIGGER
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-```
-
-> **Note**: For immediate login after signup, go to **Authentication > Providers > Email** in your Supabase dashboard and disable **Confirm email**.
+1.  **Login to Supabase**:
+    ```bash
+    npx supabase login
+    ```
+2.  **Link Project**:
+    ```bash
+    npx supabase link --project-ref your-project-id
+    ```
+3.  **Generate Types**:
+    ```bash
+    npm run update-types
+    ```
 
 ### 5. Run the application
 
@@ -109,13 +75,16 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## 📂 Project Structure
 
 *   `app/`: App Router pages and layouts.
-    *   `login/`: Login page.
-    *   `signup/`: Signup page.
-    *   `students/`: Student feedback management (Protected).
-    *   `lesson/`: Lesson feedback management (Protected).
+    *   `classes/`: Class management.
+    *   `lesson/`: Lesson feedback management.
+    *   `login/` & `signup/`: Authentication pages.
+    *   `records/`: Student record tracking.
+    *   `students/`: Student management.
+    *   `timetable/`: Schedule and calendar views.
 *   `components/`: Reusable React components (`Auth`, `Sidebar`, `HomeMenu`, etc.).
+*   `supabase/`: Supabase configuration and migrations.
+*   `types/`: TypeScript definitions (auto-generated via `update-types`).
 *   `utils/supabase/`: Supabase client configuration for Client, Server, and Middleware.
-*   `middleware.ts`: Functionality to refresh sessions and protect routes (backup security).
 
 ## 📄 License
 
