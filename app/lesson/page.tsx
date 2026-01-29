@@ -280,7 +280,7 @@ export default function LessonPage() {
                         if (recordData.progress_checked !== undefined) setProgressChecked(recordData.progress_checked);
                         if (recordData.progress_value) setProgressValue(recordData.progress_value);
                         if (recordData.student_count) setStudentCount(recordData.student_count);
-                        if (recordData.students) setStudents(recordData.students);
+                        if (recordData.students) setStudents(normalizeStudents(recordData.students));
                         if (recordData.session_number) setSessionNumber(recordData.session_number);
                         if (recordData.reminders) setReminders(recordData.reminders);
 
