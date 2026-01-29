@@ -93,6 +93,29 @@ function ScoreValue({ value }: { value: number }) {
     );
 }
 
+// --- Helper: Normalize Data ---
+function normalizeStudents(input: any[] | null | undefined): Student[] {
+    return Array.from({ length: MAX_STUDENTS }, (_, i) => {
+        const s = input?.[i] || {};
+
+        // Ensure scores object exists and has all criteria
+        const safeScores: Record<string, number> = {};
+        CRITERIA_LIST.forEach(criteria => {
+            // Use existing score if valid, else default to 8
+            const val = s.scores?.[criteria];
+            safeScores[criteria] = (typeof val === 'number') ? val : 8;
+        });
+
+        return {
+            id: i,
+            name: typeof s.name === 'string' ? s.name : "",
+            scores: safeScores,
+            attitudes: Array.isArray(s.attitudes) ? s.attitudes : [],
+            isAbsent: !!s.isAbsent,
+        };
+    });
+}
+
 export default function LessonPage() {
     // --- Hooks ---
     const lenis = useLenis();
@@ -296,7 +319,7 @@ export default function LessonPage() {
                         // want to silently "adopt" this record ID.
                         if (recordData.students) {
                             // Use the pre-filled students from DB if available!
-                            setStudents(recordData.students);
+                            setStudents(normalizeStudents(recordData.students));
                             if (recordData.student_count) setStudentCount(recordData.student_count);
                         }
                     } else {
@@ -443,7 +466,7 @@ export default function LessonPage() {
             // For now, I will load what I have. `students` JSONB contains scores/attitudes, so that's the most important part.
             // If I map `students` back to state, the UI will reflect those scores.
 
-            if (d.students) setStudents(d.students);
+            if (d.students) setStudents(normalizeStudents(d.students));
             if (d.session_number) setSessionNumber(d.session_number);
             if (d.reminders) setReminders(d.reminders);
 
@@ -503,7 +526,7 @@ export default function LessonPage() {
                     setAttitudeMode(data.attitude_mode || "individual");
                     setIncludedCriteria(data.included_criteria || ["Từ vựng", "Ngữ pháp", "Phản xạ"]);
                     setIncludedAttitudeCategories(data.included_attitude_categories || ATTITUDE_CATEGORIES);
-                    if (data.students) setStudents(data.students);
+                    if (data.students) setStudents(normalizeStudents(data.students));
                     setSessionNumber(data.session_number || 1);
                     setReminders(data.reminders || []);
                 }
