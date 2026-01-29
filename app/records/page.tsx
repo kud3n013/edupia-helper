@@ -100,13 +100,12 @@ export default function RecordsPage() {
 
     useEffect(() => {
         const initData = async () => {
-            // 1. Trigger Automation (Fire and forget, or await?)
-            // We await so we fetch the newly created records immediately
-            try {
-                await fetch("/api/records/generate", { method: "POST" });
-            } catch (e) {
-                console.error("Auto-generation failed", e);
-            }
+            // 1. Trigger Automation (DISABLED: Migrated to Backend pg_cron)
+            // try {
+            //    await fetch("/api/records/generate", { method: "POST" });
+            // } catch (e) {
+            //    console.error("Auto-generation failed", e);
+            // }
 
             await fetchRecords();
             const supabase = createClient();
@@ -184,6 +183,16 @@ export default function RecordsPage() {
     });
 
     // --- Actions ---
+    const handleRefresh = async () => {
+        setLoading(true);
+        try {
+            await fetch("/api/records/generate", { method: "POST" });
+        } catch (e) {
+            console.error("Refresh failed", e);
+        }
+        await fetchRecords();
+    };
+
     const handleAddClick = () => {
         setIsAddModalOpen(true);
     };
@@ -539,6 +548,17 @@ export default function RecordsPage() {
 
                     {/* Action Buttons */}
                     <div className="flex gap-2">
+                        <button
+                            onClick={handleRefresh}
+                            disabled={loading}
+                            title="Làm mới dữ liệu & Tạo bài học"
+                            className={`w-10 h-10 rounded-full transition-all flex items-center justify-center border border-gray-300 dark:border-gray-700 ${loading
+                                ? "bg-gray-100/50 text-gray-400 cursor-wait dark:bg-gray-800/50"
+                                : "bg-white/50 text-gray-600 hover:bg-white hover:text-[var(--primary-color)] hover:shadow-sm dark:bg-gray-800/50 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                                }`}
+                        >
+                            <svg className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
                         <button
                             onClick={handleDeleteSelected}
                             disabled={selectedIds.size === 0}

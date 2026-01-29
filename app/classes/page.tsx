@@ -182,7 +182,7 @@ export default function ClassesPage() {
     const [filters, setFilters] = useState({
         grade: "all",
         level: "all",
-        state: "Đang dạy" as "Đang dạy" | "Kết thúc" | "all",
+        state: "all" as "Đang dạy" | "Kết thúc" | "all",
         schedule: [] as string[]
     });
 
@@ -333,6 +333,10 @@ export default function ClassesPage() {
     };
 
     // --- Actions ---
+    const handleRefresh = async () => {
+        await fetchClasses();
+    };
+
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
         if (!await confirm({
@@ -576,6 +580,17 @@ export default function ClassesPage() {
 
                     <div className="flex gap-2">
                         <button
+                            onClick={handleRefresh}
+                            disabled={loading}
+                            title="Làm mới dữ liệu"
+                            className={`w-10 h-10 rounded-full transition-all flex items-center justify-center border border-gray-300 dark:border-gray-700 ${loading
+                                ? "bg-gray-100/50 text-gray-400 cursor-wait dark:bg-gray-800/50"
+                                : "bg-white/50 text-gray-600 hover:bg-white hover:text-[var(--primary-color)] hover:shadow-sm dark:bg-gray-800/50 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"
+                                }`}
+                        >
+                            <svg className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                        <button
                             onClick={handleDeleteSelected}
                             disabled={selectedIds.size === 0}
                             title={selectedIds.size > 0 ? `Xóa ${selectedIds.size} đã chọn` : "Xóa"}
@@ -751,7 +766,7 @@ export default function ClassesPage() {
                                             onClick={() => handleSort('num_finished_lessons')}
                                         >
                                             <div className="flex items-center justify-center gap-1">
-                                                Đã hoàn thành
+                                                Tổng số buổi
                                                 {sortConfig?.key === 'num_finished_lessons' && (
                                                     <span className="text-[var(--primary-color)]">
                                                         {sortConfig.direction === 'asc' ? '↑' : '↓'}
@@ -766,6 +781,19 @@ export default function ClassesPage() {
                                             <div className="flex items-center gap-1">
                                                 Lịch học
                                                 {sortConfig?.key === 'schedule' && (
+                                                    <span className="text-[var(--primary-color)]">
+                                                        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </th>
+                                        <th
+                                            className="px-4 py-3 cursor-pointer hover:text-[var(--primary-color)] group transition-colors hidden md:table-cell"
+                                            onClick={() => handleSort('state')}
+                                        >
+                                            <div className="flex items-center gap-1">
+                                                Trạng thái
+                                                {sortConfig?.key === 'state' && (
                                                     <span className="text-[var(--primary-color)]">
                                                         {sortConfig.direction === 'asc' ? '↑' : '↓'}
                                                     </span>
@@ -803,9 +831,9 @@ export default function ClassesPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                     {loading ? (
-                                        <tr><td colSpan={9} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
+                                        <tr><td colSpan={10} className="p-8 text-center text-gray-500">Đang tải dữ liệu...</td></tr>
                                     ) : sortedClasses.length === 0 ? (
-                                        <tr><td colSpan={9} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
+                                        <tr><td colSpan={10} className="p-8 text-center text-gray-500">Chưa có lớp học nào phù hợp.</td></tr>
                                     ) : (
                                         sortedClasses.map((cls, index) => (
                                             <Fragment key={cls.id}>
@@ -842,6 +870,23 @@ export default function ClassesPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 hidden md:table-cell">
+                                                        <select
+                                                            value={cls.state || "Đang dạy"}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                updateClass(cls.id, { state: e.target.value as any });
+                                                            }}
+                                                            className={`text-xs font-semibold px-2 py-1 rounded-full border-none focus:ring-0 cursor-pointer transition-colors ${cls.state === "Kết thúc"
+                                                                ? "bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400"
+                                                                : "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-500/10 dark:text-green-400"
+                                                                }`}
+                                                        >
+                                                            <option value="Đang dạy">Đang dạy</option>
+                                                            <option value="Kết thúc">Kết thúc</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3 hidden md:table-cell">
                                                         <span className="font-mono text-gray-600 dark:text-gray-400">{cls.time}</span>
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
@@ -869,7 +914,7 @@ export default function ClassesPage() {
                                                                 <td className="p-0 border-none align-top">
                                                                     <FinishedLessonsList lessons={cls.finished_lessons} />
                                                                 </td>
-                                                                <td colSpan={2} className="border-none"></td>
+                                                                <td colSpan={3} className="border-none"></td>
                                                                 <td colSpan={2} className="p-0 border-none align-top">
                                                                     <EditStudentsRow
                                                                         classRec={cls}
@@ -882,7 +927,7 @@ export default function ClassesPage() {
                                                                 <td colSpan={3} className="p-0 border-none">
                                                                     <div className="flex flex-col p-4 bg-gray-50 dark:bg-slate-800/50 gap-4 border-t border-gray-100 dark:border-gray-700 shadow-inner">
                                                                         <div>
-                                                                            <h4 className="text-xs font-semibold text-gray-500 mb-1">Đã hoàn thành</h4>
+                                                                            <h4 className="text-xs font-semibold text-gray-500 mb-1">Tổng số buổi</h4>
                                                                             <FinishedLessonsList lessons={cls.finished_lessons} />
                                                                         </div>
                                                                         <div>

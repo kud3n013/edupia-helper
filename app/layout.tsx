@@ -9,6 +9,7 @@ import { SmoothScrolling } from "@/components/SmoothScrolling";
 import { FaviconManager } from "@/components/FaviconManager";
 import { ConfirmationProvider } from "@/contexts/ConfirmationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import NextTopLoader from "nextjs-toploader";
 
 const beVietnamPro = Be_Vietnam_Pro({
   weight: ["400", "500", "600", "700"],
@@ -36,6 +37,7 @@ export default async function RootLayout({
       <body
         className={`${beVietnamPro.variable} font-sans antialiased`}
       >
+        <NextTopLoader showSpinner={false} />
         <SmoothScrolling>
           <AuthProvider>
             <FaviconManager />
