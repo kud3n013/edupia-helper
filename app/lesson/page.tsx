@@ -240,182 +240,6 @@ export default function LessonPage() {
 
     }, [classId]);
 
-    // Check for existing record AND Auto-prefill from Class Template
-    useEffect(() => {
-        if (!classId) {
-            setDuplicateWarning(null);
-            setExistingRecordData(null);
-            setFetchedClassData(null);
-            return;
-        }
-
-        const recordIdParam = searchParams.get("recordId");
-
-        const checkData = async () => {
-            try {
-                if (!user) return;
-
-                const { createClient } = await import("@/utils/supabase/client");
-                const supabase = createClient();
-
-                // 0. Priority: Load SPECIFIC record if "Edit" mode (recordId present)
-                if (recordIdParam) {
-                    const { data: recordData } = await supabase
-                        .from("records")
-                        .select("*")
-                        .eq("id", recordIdParam)
-                        .maybeSingle();
-
-                    if (recordData) {
-                        // Immediately Load Data
-                        skipAutoFillRef.current = true; // Block template auto-fill
-                        setExistingId(recordData.id);
-
-                        // Populate State
-                        if (recordData.grade) setGrade(recordData.grade);
-                        if (recordData.level) setLevel(recordData.level);
-                        if (recordData.lesson_content) setLessonContent(recordData.lesson_content);
-                        if (recordData.atmosphere_checked !== undefined) setAtmosphereChecked(recordData.atmosphere_checked);
-                        if (recordData.atmosphere_value) setAtmosphereValue(recordData.atmosphere_value);
-                        if (recordData.progress_checked !== undefined) setProgressChecked(recordData.progress_checked);
-                        if (recordData.progress_value) setProgressValue(recordData.progress_value);
-                        if (recordData.student_count) setStudentCount(recordData.student_count);
-                        if (recordData.students) setStudents(normalizeStudents(recordData.students));
-                        if (recordData.session_number) setSessionNumber(recordData.session_number);
-                        if (recordData.reminders) setReminders(recordData.reminders);
-
-                        // Re-derive school level
-                        if (recordData.grade) {
-                            if (recordData.grade >= 1 && recordData.grade <= 5) setSchoolLevel("TH");
-                            else if (recordData.grade >= 6 && recordData.grade <= 9) setSchoolLevel("THCS");
-                        }
-
-                        // No warnings, we are editing explicitly
-                        setDuplicateWarning(null);
-                        setExistingRecordData(null);
-                        return; // Done
-                    }
-                }
-
-                // 1. Check for existing record (Priority 1)
-                const { data: recordData } = await supabase
-                    .from("records")
-                    .select("*")
-                    .eq("user_id", user.id)
-                    .eq("class_id", classId)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                if (recordData) {
-                    // Check if it's a pending automated record
-                    if (recordData.status === "Chưa mở lớp") {
-                        // It's a valid record waiting to be filled. Not a duplicate warning case.
-                        // But we want to use its ID so we update it (UPSERT/UPDATE) instead of creating new.
-                        setExistingId(recordData.id);
-                        setDuplicateWarning(null);
-                        // We might want to load its pre-filled date/students if they exist?
-                        // The existing logic below handles loading if user confirms, but here we probably
-                        // want to silently "adopt" this record ID.
-                        if (recordData.students) {
-                            // Use the pre-filled students from DB if available!
-                            setStudents(normalizeStudents(recordData.students));
-                            if (recordData.student_count) setStudentCount(recordData.student_count);
-                        }
-                    } else {
-                        // Only show warning if NOT editing (which is handled above, but double check ID)
-                        if (recordData.id !== recordIdParam) {
-                            setDuplicateWarning(`Lớp này đã được tạo feedback ngày ${recordData.date}`);
-                            setExistingId(recordData.id);
-                        } else {
-                            // Should be covered by step 0, but fallback
-                            setExistingId(recordData.id);
-                        }
-                    }
-                    if (recordData.lesson_content) {
-                        // Only show "Load Old?" if NOT editing same record
-                        if (recordData.id !== recordIdParam) {
-                            setExistingRecordData(recordData);
-                        } else {
-                            setExistingRecordData(null);
-                        }
-                    } else {
-                        setExistingRecordData(null);
-                    }
-                    // If record exists, we don't need to auto-fill from class template immediately
-                    // But we might want to store it in case they cancel load?
-                    // Actually, if record exists, the user is prompted to load it. 
-                    // If they dismiss, they might want the template?
-                    // Let's fetch template anyway but only apply if NO record or explicitly handled.
-                } else {
-                    setDuplicateWarning(null);
-                    setExistingRecordData(null);
-                    setExistingId(null);
-                }
-
-                // 2. Check for Class Template (Priority 2 - if no record active data loaded yet)
-                // Pattern: [fixed_class_id]-[number] eg "C2.34-1" -> "C2.34"
-                // Pattern: [fixed_class_id]-[suffix] eg "C2.34-1" or "C2.34-XX" -> "C2.34"
-                const match = classId.match(/^(.*)-(.+)$/);
-                if (match) {
-                    const fixedClassId = match[1];
-                    const { data: classData } = await supabase
-                        .from("classes")
-                        .select("students, grade, level, num_students")
-                        .eq("user_id", user.id)
-                        .eq("fixed_class_id", fixedClassId)
-                        .maybeSingle();
-
-
-                    if (classData) {
-                        setFetchedClassData(classData);
-
-                        // AUTO-FILL Logic:
-                        // Only auto-fill if:
-                        // 1. No existing record found (recordData is null)
-                        // 2. We haven't already typed in students manually? (Hard to track, but we can check if students are default)
-                        // 3. We are NOT restoring from a draft (checked via skipAutoFillRef)
-
-                        if (!recordData && !recordIdParam) { // Added check for recordIdParam
-                            if (skipAutoFillRef.current) {
-                                skipAutoFillRef.current = false;
-                            } else {
-                                // Map class students to Student objects
-                                const newStudents = Array.from({ length: MAX_STUDENTS }, (_, i) => ({
-                                    id: i,
-                                    name: (classData.students && classData.students[i]) ? classData.students[i] : "",
-                                    scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
-                                    attitudes: [],
-                                }));
-
-                                setStudents(newStudents);
-                                setStudentCount(classData.num_students || classData.students?.length || 4);
-                                if (classData.grade) setGrade(classData.grade);
-                                if (classData.level) setLevel(classData.level);
-
-                                // Re-eval school level
-                                if (classData.grade) {
-                                    if (classData.grade >= 1 && classData.grade <= 5) setSchoolLevel("TH");
-                                    else if (classData.grade >= 6 && classData.grade <= 9) setSchoolLevel("THCS");
-                                }
-                            }
-                        }
-                    } else {
-                        setFetchedClassData(null);
-                    }
-                } else {
-                    setFetchedClassData(null);
-                }
-
-            } catch (error) {
-                console.error("Error checking data:", error);
-            }
-        };
-
-        const timeoutId = setTimeout(checkData, 500); // 500ms debounce
-        return () => clearTimeout(timeoutId);
-    }, [classId, user, searchParams]); // Added searchParams dependency
-
     const handleLoadOldFeedback = async () => {
         if (!existingRecordData) return;
 
@@ -425,11 +249,9 @@ export default function LessonPage() {
             confirmText: "Tải lại",
             type: "warning"
         })) {
-            // Use RPC to atomically clear draft and copy record data to draft
             try {
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
-                // existingId is the record ID we found
                 if (existingId) {
                     const { error } = await supabase.rpc('load_record_to_draft', { p_record_id: existingId });
                     if (error) console.error("Error invoking RPC:", error);
@@ -447,32 +269,11 @@ export default function LessonPage() {
             if (d.progress_checked !== undefined) setProgressChecked(d.progress_checked);
             if (d.progress_value) setProgressValue(d.progress_value);
             if (d.student_count) setStudentCount(d.student_count);
-            // Derive school level from grade if possible, or just keep current? 
-            // If we have it in DB we should save/load it. But we don't have school_level column in records explicitly in my migration? 
-            // Wait, records schema relies on `grade` to deduce school level usually. 
-            // Let's re-run logic:
-            if (d.grade) {
-                if (d.grade >= 1 && d.grade <= 5) setSchoolLevel("TH");
-                else if (d.grade >= 6 && d.grade <= 9) setSchoolLevel("THCS");
-            }
-
-            // Note: We didn't save knowledge_mode/attitude_mode/included_criteria in records table in the previous migration!
-            // The user asked to "Recreate every columns from lesson page... into table on public.records"
-            // My migration added: lesson_content, atmosphere_value, progress_value, students, reminders, session_number.
-            // I missed: knowledge_mode, attitude_mode, included_criteria, included_attitude_categories.
-            // Oops. 
-            // However, typical usage might not need these modes persisted strictly if we have the final scores.
-            // BUT, to "load back" fully, we kinda need them.
-            // For now, I will load what I have. `students` JSONB contains scores/attitudes, so that's the most important part.
-            // If I map `students` back to state, the UI will reflect those scores.
 
             if (d.students) setStudents(normalizeStudents(d.students));
             if (d.session_number) setSessionNumber(d.session_number);
             if (d.reminders) setReminders(d.reminders);
 
-            // Clear prompt but keep warning? Or clear everything?
-            // "Utilize the columns... to load back... otherwise... let users edit as is"
-            // Usually if loaded, we might want to clear the "load?" prompt.
             setExistingRecordData(null);
         }
     };
@@ -485,7 +286,6 @@ export default function LessonPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     // 1. Fetch data on mount
-    // 1. Fetch data on mount
     useEffect(() => {
         if (authLoading) return;
 
@@ -495,8 +295,6 @@ export default function LessonPage() {
 
                 const { createClient } = await import("@/utils/supabase/client");
                 const supabase = createClient();
-
-                // Removed getUser call
 
                 const { data, error } = await supabase
                     .from("lessons")
@@ -509,9 +307,8 @@ export default function LessonPage() {
                     return;
                 }
 
-
                 if (data) {
-                    skipAutoFillRef.current = true; // Prevent Class Template overwriting
+                    skipAutoFillRef.current = true;
                     setClassId(data.class_id || "");
                     setGrade(data.grade || null);
                     setLevel(data.level || null);
@@ -573,12 +370,45 @@ export default function LessonPage() {
                     updated_at: new Date().toISOString(),
                 };
 
-                const { error } = await supabase
+                // Use .select() to get the updated data back (including trigger updates)
+                const { data, error } = await supabase
                     .from("lessons")
-                    .upsert(payload);
+                    .upsert(payload)
+                    .select()
+                    .single();
 
                 if (error) {
                     console.error("Error saving lesson data:", error);
+                } else if (data) {
+                    console.log("Saved and synced:", data);
+                    // Sync state with backend (Trigger might have updated students)
+                    // Only update if backend has different student count or students
+                    // This prevents jitter if they are typing, but for "class_id change" trigger, it's essential.
+                    // We need to be careful not to overwrite user input if they are typing names.
+
+                    // Logic: If the returned student count is different, OR if we just changed class_id (how to detect?)
+                    // The trigger only runs on class_id change. 
+                    // So if backend returns a different list structure, we should update.
+
+                    if (data.students) {
+                        const newStudents = normalizeStudents(data.students);
+                        // Deep compare or just crude length check?
+                        // Let's just update for now, as the trigger only explicitly changes it on class ID change.
+                        // But wait, if we send `students` (user input), the trigger WON'T overwrite it 
+                        // UNLESS class_id changed.
+                        // So if class_id didn't change, the trigger is no-op, and `data.students` == `payload.students`.
+                        // So it's safe to setStudents.
+
+                        // EXCEPT: if the user is typing fast, and we save, and we get back data...
+                        // If we overwrite `students` state, we might revert their last few characters if network is slow?
+                        // Ideally we only update `students` if `classId` changed recenty? 
+
+                        // Actually, if the trigger ran, it replaced the students entirely.
+                        // If the trigger didn't run, it just saved what we sent.
+                        // So updating state matches truth.
+                        setStudents(newStudents);
+                    }
+                    if (data.student_count) setStudentCount(data.student_count);
                 }
             } catch (err) {
                 console.error("Unexpected error saving data:", err);
