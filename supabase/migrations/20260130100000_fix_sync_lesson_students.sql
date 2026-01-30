@@ -73,8 +73,3 @@ CREATE OR REPLACE FUNCTION public.sync_lesson_students()
    RETURN NEW;
  END;
  $function$;
-
- CREATE TRIGGER on_lesson_class_change
- BEFORE INSERT OR UPDATE OF class_id ON public.lessons
- FOR EACH ROW
- EXECUTE FUNCTION public.sync_lesson_students();

@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION public.sync_lesson_students()
    v_student_name text;
    v_idx int;
    v_student_obj jsonb;
+   v_existing_data jsonb;
  BEGIN
     -- Only proceed if class_id has changed (and is not null)
    IF (NEW.class_id IS DISTINCT FROM OLD.class_id) AND (NEW.class_id IS NOT NULL AND NEW.class_id <> '') THEN
@@ -40,13 +41,28 @@ CREATE OR REPLACE FUNCTION public.sync_lesson_students()
            v_idx := 0;
            FOR v_student_name IN SELECT * FROM jsonb_array_elements_text(v_class_record.students)
            LOOP
-              -- Construct Student Object
-              v_student_obj := jsonb_build_object(
-                 'id', v_idx,
-                 'name', v_student_name,
-                 'attitudes', '[]'::jsonb,
-                 'isAbsent', false
-              );
+              -- Try to find this student in the provided new data (to preserve scores)
+              v_existing_data := NULL;
+              IF jsonb_typeof(NEW.students) = 'array' THEN
+                 SELECT item INTO v_existing_data
+                 FROM jsonb_array_elements(NEW.students) item
+                 WHERE item->>'name' = v_student_name
+                 LIMIT 1;
+              END IF;
+
+              IF v_existing_data IS NOT NULL THEN
+                 -- Preserve existing data (scores, etc), just update ID/Order
+                 v_student_obj := v_existing_data || jsonb_build_object('id', v_idx, 'name', v_student_name);
+              ELSE
+                 -- New student found in class but not in payload
+                 -- Construct default object (no scores, they default to 8 in UI)
+                 v_student_obj := jsonb_build_object(
+                    'id', v_idx,
+                    'name', v_student_name,
+                    'attitudes', '[]'::jsonb,
+                    'isAbsent', false
+                 );
+              END IF;
               
               v_students_json := v_students_json || v_student_obj;
               v_idx := v_idx + 1;
@@ -73,8 +89,3 @@ CREATE OR REPLACE FUNCTION public.sync_lesson_students()
    RETURN NEW;
  END;
  $function$;
-
- CREATE TRIGGER on_lesson_class_change
- BEFORE INSERT OR UPDATE OF class_id ON public.lessons
- FOR EACH ROW
- EXECUTE FUNCTION public.sync_lesson_students();

@@ -60,6 +60,7 @@ const ATTITUDE_CATEGORIES = Object.keys(ATTITUDE_DATA);
 // --- Types ---
 interface Student {
     id: number;
+    uuid: string;
     name: string;
     scores: Record<string, number>;
     attitudes: string[];
@@ -108,6 +109,7 @@ function normalizeStudents(input: any[] | null | undefined): Student[] {
 
         return {
             id: i,
+            uuid: (typeof s.uuid === 'string' && s.uuid) ? s.uuid : Math.random().toString(36).substring(7),
             name: typeof s.name === 'string' ? s.name : "",
             scores: safeScores,
             attitudes: Array.isArray(s.attitudes) ? s.attitudes : [],
@@ -154,6 +156,7 @@ export default function LessonPage() {
     const [students, setStudents] = useState<Student[]>(() => {
         return Array.from({ length: MAX_STUDENTS }, (_, i) => ({
             id: i,
+            uuid: Math.random().toString(36).substring(7),
             name: "",
             scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
             attitudes: [],
@@ -392,21 +395,44 @@ export default function LessonPage() {
 
                     if (data.students) {
                         const newStudents = normalizeStudents(data.students);
-                        // Deep compare or just crude length check?
-                        // Let's just update for now, as the trigger only explicitly changes it on class ID change.
-                        // But wait, if we send `students` (user input), the trigger WON'T overwrite it 
-                        // UNLESS class_id changed.
-                        // So if class_id didn't change, the trigger is no-op, and `data.students` == `payload.students`.
-                        // So it's safe to setStudents.
 
-                        // EXCEPT: if the user is typing fast, and we save, and we get back data...
-                        // If we overwrite `students` state, we might revert their last few characters if network is slow?
-                        // Ideally we only update `students` if `classId` changed recenty? 
+                        // Merge Strategy:
+                        // 1. Trust Backend for: List Order, Student Names, Existence.
+                        // 2. Trust Frontend (Local State) for: Scores, Attitudes (to avoid reverting).
 
-                        // Actually, if the trigger ran, it replaced the students entirely.
-                        // If the trigger didn't run, it just saved what we sent.
-                        // So updating state matches truth.
-                        setStudents(newStudents);
+                        // improved Merge Strategy (Client-First Order):
+                        // 1. Prioritize Client Order to fix "reversing" glitch.
+                        // 2. Validate against Backend Roster (Existence).
+                        // 3. Preserve Client Data (Scores).
+
+                        setStudents(prevStudents => {
+                            const prevValid = prevStudents.filter(s => s.name && s.name.trim() !== "");
+                            const nextValid = newStudents.filter(s => s.name && s.name.trim() !== "");
+
+                            const merged: any[] = [];
+                            const processedNames = new Set<string>();
+
+                            // A. Keep Client Order for existing students
+                            prevValid.forEach(p => {
+                                const match = nextValid.find(n => n.name === p.name);
+                                if (match) {
+                                    // Found in backend roster -> Keep it in client's position
+                                    // Use 'match' for base structure but 'p' for data (scores/attitudes)
+                                    merged.push({ ...match, ...p });
+                                    processedNames.add(p.name);
+                                }
+                            });
+
+                            // B. Append New Backend Students (Roster Additions)
+                            nextValid.forEach(n => {
+                                if (!processedNames.has(n.name)) {
+                                    merged.push(n);
+                                }
+                            });
+
+                            // C. Normalize (Pad to MAX_STUDENTS + Re-index IDs)
+                            return normalizeStudents(merged);
+                        });
                     }
                     if (data.student_count) setStudentCount(data.student_count);
                 }
@@ -572,6 +598,7 @@ export default function LessonPage() {
         setIncludedAttitudeCategories(ATTITUDE_CATEGORIES);
         setStudents(Array.from({ length: MAX_STUDENTS }, (_, i) => ({
             id: i,
+            uuid: Math.random().toString(36).substring(7),
             name: "",
             scores: CRITERIA_LIST.reduce((acc, c) => ({ ...acc, [c]: 8 }), {}),
             attitudes: [],
@@ -1018,7 +1045,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                         <AnimatePresence mode="popLayout" initial={false}>
                             {students.slice(0, studentCount).map((student) => (
                                 <Reorder.Item
-                                    key={student.id}
+                                    key={student.uuid}
                                     value={student}
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
