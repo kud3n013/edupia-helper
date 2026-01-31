@@ -24,7 +24,6 @@ interface TeachingRecord {
     feedback_status: "Đã nhận xét" | "Chưa nhận xét";
     date: string; // YYYY-MM-DD
     time_start: string | null;
-    time_start: string | null;
     pay_rate: string;
     applied_pay_rate?: string;
 }
@@ -71,7 +70,6 @@ export default function RecordsPage() {
         class_id: "",
         status: "Hoàn thành",
         feedback_status: "Đã nhận xét",
-        date: new Date().toISOString().split('T')[0],
         date: new Date().toISOString().split('T')[0],
         time_start: "19:00",
         pay_rate: currentPayRate || "B"
@@ -180,8 +178,8 @@ export default function RecordsPage() {
         const bVal = b[sortConfig.key];
 
         if (aVal === bVal) return 0;
-        if (aVal === null) return 1;
-        if (bVal === null) return -1;
+        if (aVal === null || aVal === undefined) return 1;
+        if (bVal === null || bVal === undefined) return -1;
 
         const comparison = aVal > bVal ? 1 : -1;
         return sortConfig.direction === "asc" ? comparison : -comparison;
@@ -277,7 +275,6 @@ export default function RecordsPage() {
                 class_id: "",
                 status: "Hoàn thành",
                 feedback_status: "Đã nhận xét",
-                date: new Date().toISOString().split('T')[0],
                 date: new Date().toISOString().split('T')[0],
                 time_start: "19:00",
                 pay_rate: currentPayRate
