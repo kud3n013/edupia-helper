@@ -780,23 +780,22 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
             // Removed getUser logic
 
             if (user) {
-                // Get latest pay_rate from previous record or default 'D'
-                let payRate = 'D';
-                const { data: lastRecord } = await supabase
-                    .from('records')
+                // Get current profile pay_rate for snapshot (applied_pay_rate)
+                let appliedPayRate = 'B';
+                const { data: profile } = await supabase
+                    .from('profiles')
                     .select('pay_rate')
-                    .eq('user_id', user.id)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
+                    .eq('id', user.id)
                     .single();
 
-                if (lastRecord?.pay_rate) {
-                    payRate = lastRecord.pay_rate;
+                if (profile?.pay_rate) {
+                    appliedPayRate = profile.pay_rate;
                 }
 
                 const recordPayload = {
                     user_id: user.id,
                     class_id: classId,
+                    applied_pay_rate: appliedPayRate, // Ensure snapshot is saved
                     grade: grade || 0,
                     level: level || '',
                     student_count: studentCount,
@@ -805,7 +804,7 @@ Yêu cầu output (Trực tiếp, thẳng thắn, không khen sáo rỗng, khôn
                     class_type: "BU",
                     feedback_status: "Đã nhận xét",
                     date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-                    pay_rate: payRate,
+                    pay_rate: appliedPayRate, // Legacy field
                     lesson_content: lessonContent,
                     atmosphere_checked: atmosphereChecked,
                     atmosphere_value: atmosphereValue,

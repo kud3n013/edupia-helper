@@ -4,10 +4,10 @@ import { createClient } from "@/utils/supabase/client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const PAY_RATES = ["S+", "A+", "B+", "C+", "D"];
+export const PAY_RATES = ["A+", "A", "B", "C", "D"];
 
 export function PayRateSelector({ initialRate }: { initialRate?: string }) {
-    const [rate, setRate] = useState(initialRate || "B+");
+    const [rate, setRate] = useState(initialRate || "B");
     const [updating, setUpdating] = useState(false);
     const supabase = createClient();
     const router = useRouter();

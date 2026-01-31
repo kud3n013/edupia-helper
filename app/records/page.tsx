@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/contexts/ConfirmationContext";
 import { ClassRecord } from "@/components/AgendaView";
+import { PAY_RATES } from "@/components/PayRateSelector";
 
 // --- Types ---
 interface TeachingRecord {
@@ -23,11 +24,13 @@ interface TeachingRecord {
     feedback_status: "Đã nhận xét" | "Chưa nhận xét";
     date: string; // YYYY-MM-DD
     time_start: string | null;
+    time_start: string | null;
     pay_rate: string;
+    applied_pay_rate?: string;
 }
 
 
-const STATUS_OPTIONS = ["Hoàn thành", "HS vắng mặt", "GS vắng mặt", "Hủy", "Chưa mở lớp", "Feedback trễ"];
+const STATUS_OPTIONS = ["Hoàn thành", "HS vắng mặt", "GS vắng mặt", "Hủy", "Chưa mở lớp", "Đã mở lớp", "Feedback trễ"];
 const CLASS_TYPES = ["BU", "CN"];
 const FEEDBACK_STATUS_OPTIONS = ["Đã nhận xét", "Chưa nhận xét"];
 const TIME_OPTIONS = [
@@ -48,7 +51,7 @@ export default function RecordsPage() {
     const [classes, setClasses] = useState<ClassRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState("");
-    const [currentPayRate, setCurrentPayRate] = useState<string>("B+"); // User preference - fetched from profile
+    const [currentPayRate, setCurrentPayRate] = useState<string>("B"); // User preference - fetched from profile
 
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: keyof TeachingRecord; direction: "asc" | "desc" }>({
@@ -69,7 +72,9 @@ export default function RecordsPage() {
         status: "Hoàn thành",
         feedback_status: "Đã nhận xét",
         date: new Date().toISOString().split('T')[0],
-        time_start: "19:00"
+        date: new Date().toISOString().split('T')[0],
+        time_start: "19:00",
+        pay_rate: currentPayRate || "B"
     });
 
 
@@ -195,6 +200,8 @@ export default function RecordsPage() {
 
     const handleAddClick = () => {
         setIsAddModalOpen(true);
+        // Refresh default pay rate in case it changed
+        setNewRecordData(prev => ({ ...prev, pay_rate: currentPayRate || "B" }));
     };
 
     const handleSaveNewRecord = async () => {
@@ -246,7 +253,7 @@ export default function RecordsPage() {
             feedback_status: newRecordData.feedback_status as any,
             date: newRecordData.date,
             time_start: newRecordData.time_start,
-            pay_rate: currentPayRate,
+            pay_rate: newRecordData.pay_rate || currentPayRate,
         };
 
 
@@ -271,7 +278,9 @@ export default function RecordsPage() {
                 status: "Hoàn thành",
                 feedback_status: "Đã nhận xét",
                 date: new Date().toISOString().split('T')[0],
-                time_start: "19:00"
+                date: new Date().toISOString().split('T')[0],
+                time_start: "19:00",
+                pay_rate: currentPayRate
             });
         }
     };
@@ -758,7 +767,7 @@ export default function RecordsPage() {
                                                     {record.level}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]">
+                                            <td className="px-4 py-3 font-bold text-right text-[var(--primary-color)]" title={`Mức lương áp dụng: ${record.applied_pay_rate || record.pay_rate || 'D'}`}>
                                                 {formatCurrency(record.rate)}
                                             </td>
                                             <td className="px-4 py-3">
@@ -771,7 +780,8 @@ export default function RecordsPage() {
                                                                 record.status === "HS vắng mặt" ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:hover:bg-yellow-500/20" :
                                                                     record.status === "GS vắng mặt" ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20" :
                                                                         record.status === "Feedback trễ" ? "bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:hover:bg-pink-500/20" :
-                                                                            "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700"
+                                                                            record.status === "Đã mở lớp" ? "bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-400 dark:hover:bg-cyan-500/20" :
+                                                                                "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700"
                                                             }`}
                                                     >
                                                         {STATUS_OPTIONS.map(opt => (
@@ -1053,6 +1063,19 @@ export default function RecordsPage() {
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bậc lương áp dụng</label>
+                                <select
+                                    value={newRecordData.pay_rate}
+                                    onChange={(e) => setNewRecordData({ ...newRecordData, pay_rate: e.target.value })}
+                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 p-2.5 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-[var(--primary-color)] outline-none"
+                                >
+                                    {PAY_RATES.map(rate => (
+                                        <option key={rate} value={rate}>{rate}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className="flex justify-end gap-3 mt-8">

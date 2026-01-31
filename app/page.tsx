@@ -81,7 +81,7 @@ export default async function Home() {
                   </form>
                   {/* Pay Rate Selector Inside Card */}
                   <div className="-mt-2">
-                    <PayRateSelector initialRate={profile?.pay_rate || 'B+'} />
+                    <PayRateSelector initialRate={profile?.pay_rate || 'B'} />
                   </div>
                 </div>
               </div>
