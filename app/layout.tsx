@@ -42,7 +42,7 @@ export default async function RootLayout({
           <AuthProvider>
             <FaviconManager />
             <ConfirmationProvider>
-              <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[60px]">
+              <div className="flex min-h-screen relative pr-[var(--sidebar-width)] max-sm:flex-col max-sm:pr-0 max-sm:pb-[80px]">
                 <Background />
                 {/* Main Content Area */}
                 <main className="flex-1 w-full py-8 px-4 md:px-8">

@@ -41,7 +41,7 @@ export function Sidebar({ isAuthenticated }: { isAuthenticated: boolean }) {
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 className={`fixed right-0 top-0 h-full w-[80px] bg-[var(--glass-bg)] backdrop-blur-md border-l border-[var(--glass-border)] flex flex-col items-center py-8 z-50 transition-transform duration-300 shadow-[var(--shadow-custom-lg)] 
-                max-sm:bottom-0 max-sm:top-auto max-sm:h-[60px] max-sm:w-full max-sm:flex-row max-sm:border-l-0 max-sm:border-t max-sm:justify-around max-sm:py-0 max-sm:translate-x-0
+                max-sm:bottom-4 max-sm:top-auto max-sm:h-[60px] max-sm:w-[calc(100%-32px)] max-sm:left-4 max-sm:right-4 max-sm:flex-row max-sm:border max-sm:rounded-2xl max-sm:justify-around max-sm:py-0 max-sm:translate-x-0
                 ${!isPinned && !isHovered ? "translate-x-[calc(100%-16px)]" : "translate-x-0"}
                 `}
             >
