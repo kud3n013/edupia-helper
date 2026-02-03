@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { useConfirm } from "@/contexts/ConfirmationContext";
 import { ClassRecord } from "@/components/AgendaView";
 import { PAY_RATES } from "@/components/PayRateSelector";
+import { exportToCSV, importFromCSV } from "@/utils/csv-utils";
+import { useRef } from "react";
 
 // --- Types ---
 interface TeachingRecord {
@@ -63,6 +65,7 @@ export default function RecordsPage() {
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Modal State
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -395,6 +398,81 @@ export default function RecordsPage() {
         return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
     };
 
+    // --- CSV Actions ---
+    const handleExport = () => {
+        // Export filtered records so user gets what they see
+        const dataToExport = filteredRecords.map(r => ({
+            "Mã Lớp": r.class_id,
+            "Lớp": r.grade,
+            "Trình độ": r.level,
+            "Trạng thái": r.status,
+            "Loại": r.class_type,
+            "Feedback": r.feedback_status,
+            "Ngày": r.date,
+            "Giờ": r.time_start,
+            "Hệ số lương": r.pay_rate,
+            "Thu nhập": r.rate
+        }));
+        exportToCSV(dataToExport, `Bang_luong_${filters.month || 'all'}.csv`);
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const importedData = await importFromCSV<any>(file);
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // Helper to parse date from potential formats if needed, currently assume YYYY-MM-DD or simple
+            // But let's assume valid ISO or YYYY-MM-DD from export
+            const recordsToInsert = importedData.map(row => {
+                // We need some validation or defaults
+                return {
+                    user_id: user.id,
+                    class_id: row["Mã Lớp"] || "",
+                    grade: Number(row["Lớp"]) || 0,
+                    level: row["Trình độ"] || "Không xác định",
+                    status: row["Trạng thái"] || "Hoàn thành",
+                    class_type: row["Loại"] || "BU",
+                    feedback_status: row["Feedback"] || "Đã nhận xét",
+                    date: row["Ngày"] || new Date().toISOString().split('T')[0],
+                    time_start: row["Giờ"] || "19:00",
+                    pay_rate: row["Hệ số lương"] || "B",
+                    // Rate is calculated by DB trigger, but if import helps? No, let DB handle it or assume 0
+                    rate: 0
+                };
+            }).filter(r => r.class_id);
+
+            if (recordsToInsert.length === 0) {
+                alert("Không tìm thấy dữ liệu hợp lệ trong file CSV");
+                return;
+            }
+
+            const { error } = await supabase.from("records").insert(recordsToInsert);
+
+            if (error) {
+                console.error("Import error:", error);
+                alert("Lỗi khi nhập dữ liệu: " + error.message);
+            } else {
+                alert(`Đã nhập thành công ${recordsToInsert.length} buổi học.`);
+                handleRefresh();
+            }
+
+        } catch (error) {
+            console.error("CSV Parse Error:", error);
+            alert("Lỗi đọc file CSV");
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
     // --- Analytics Data ---
     const totalIncome = useMemo(() => {
         return filteredRecords.reduce((sum, r) => sum + (r.rate || 0), 0);
@@ -515,7 +593,7 @@ export default function RecordsPage() {
                 </div>
 
                 {/* Mobile Row for Filter & Actions */}
-                <div className="flex w-full md:w-auto items-center justify-between md:justify-start gap-3">
+                <div className="flex w-full md:w-auto items-center justify-start gap-2 flex-wrap md:flex-nowrap">
                     {/* Filter Toggle */}
                     <button
                         onClick={() => setShowFilters(!showFilters)}
@@ -582,6 +660,31 @@ export default function RecordsPage() {
                             className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 w-10 h-10 rounded-full transition-all flex items-center justify-center shadow-lg shadow-indigo-500/30"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                    </div>
+
+                    {/* CSV Buttons - Mobile responsive placement */}
+                    <div className="flex gap-2 border-l pl-2 border-gray-200 dark:border-gray-700">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept=".csv"
+                            className="hidden"
+                        />
+                        <button
+                            onClick={handleExport}
+                            title="Xuất CSV"
+                            className="p-2 text-gray-500 hover:text-[var(--primary-color)] hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-all"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>
+                        <button
+                            onClick={handleImportClick}
+                            title="Nhập CSV"
+                            className="p-2 text-gray-500 hover:text-[var(--primary-color)] hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-all"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         </button>
                     </div>
                 </div>

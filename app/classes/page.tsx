@@ -171,6 +171,9 @@ const EditStudentsRow = ({ classRec, onUpdate }: { classRec: ClassRecord, onUpda
     );
 };
 
+import { exportToCSV, importFromCSV } from "@/utils/csv-utils";
+import { useRef } from "react";
+
 export default function ClassesPage() {
     const [classes, setClasses] = useState<ClassRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -209,6 +212,7 @@ export default function ClassesPage() {
 
     // View Mode
     const [viewMode, setViewMode] = useState<"list" | "agenda">("list");
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fetchClasses();
@@ -522,6 +526,75 @@ export default function ClassesPage() {
     // --- Sub-component: AgendaView ---
     // AgendaView removed (imported)
 
+    // --- CSV Actions ---
+    const handleExport = () => {
+        const dataToExport = classes.map(c => ({
+            "Mã Lớp": c.fixed_class_id,
+            "Lớp": c.grade,
+            "Trình độ": c.level,
+            "Số học sinh": c.num_students,
+            "Học sinh": c.students.join(", "),
+            "Lịch học": c.schedule.join(", "),
+            "Giờ": c.time,
+            "Trạng thái": c.state
+        }));
+        exportToCSV(dataToExport, `Danh_sach_lop_${new Date().toISOString().split('T')[0]}.csv`);
+    };
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const importedData = await importFromCSV<any>(file);
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const recordsToInsert = importedData.map(row => {
+                const scheduleStr = row["Lịch học"] || "";
+                const studentStr = row["Học sinh"] || "";
+
+                return {
+                    user_id: user.id,
+                    fixed_class_id: row["Mã Lớp"] || "",
+                    grade: Number(row["Lớp"]) || 0,
+                    level: row["Trình độ"] || "Không xác định",
+                    state: row["Trạng thái"] || "Đang dạy",
+                    num_students: Number(row["Số học sinh"]) || 0,
+                    students: studentStr ? studentStr.split(",").map((s: string) => s.trim()) : [],
+                    schedule: scheduleStr ? scheduleStr.split(",").map((s: string) => s.trim()) : [],
+                    time: row["Giờ"] || "19:00"
+                };
+            }).filter(r => r.fixed_class_id); // Basic validation
+
+            if (recordsToInsert.length === 0) {
+                alert("Không tìm thấy dữ liệu hợp lệ trong file CSV");
+                return;
+            }
+
+            const { error } = await supabase.from("classes").insert(recordsToInsert);
+
+            if (error) {
+                console.error("Import error:", error);
+                alert("Lỗi khi nhập dữ liệu: " + error.message);
+            } else {
+                alert(`Đã nhập thành công ${recordsToInsert.length} lớp.`);
+                fetchClasses();
+            }
+
+        } catch (error) {
+            console.error("CSV Parse Error:", error);
+            alert("Lỗi đọc file CSV");
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
     return (
         <div className="w-full px-4 md:px-8 py-6 animate-fade-in pb-20">
             <h1 className="text-3xl font-bold text-center mb-8 text-[var(--accent-color)]">Quản lý lớp chủ nhiệm</h1>
@@ -541,7 +614,7 @@ export default function ClassesPage() {
                 </div>
 
                 {/* Filter and Actions */}
-                <div className="flex w-full md:w-auto items-center justify-between md:justify-start gap-3">
+                <div className="flex w-full md:w-auto items-center justify-start gap-2 flex-wrap md:flex-nowrap">
                     {/* Filter Toggle */}
                     <button
                         onClick={() => setShowFilters(!showFilters)}
@@ -607,6 +680,31 @@ export default function ClassesPage() {
                             className="bg-[var(--primary-color)] text-white hover:bg-indigo-600 w-10 h-10 rounded-full transition-all flex items-center justify-center shadow-lg shadow-indigo-500/30"
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                    </div>
+
+                    {/* CSV Buttons */}
+                    <div className="flex gap-2 border-l pl-2 border-gray-200 dark:border-gray-700">
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept=".csv"
+                            className="hidden"
+                        />
+                        <button
+                            onClick={handleExport}
+                            title="Xuất CSV"
+                            className="p-2 text-gray-500 hover:text-[var(--primary-color)] hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-all"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>
+                        <button
+                            onClick={handleImportClick}
+                            title="Nhập CSV"
+                            className="p-2 text-gray-500 hover:text-[var(--primary-color)] hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-all"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                         </button>
                     </div>
                 </div>
